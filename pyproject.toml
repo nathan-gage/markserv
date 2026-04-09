@@ -1,16 +1,76 @@
 [project]
 name = "markserv"
 version = "0.1.0"
-description = "CLI tool for serving markdown"
+description = "Live-render GitHub-flavored markdown files and folders"
 readme = "README.md"
-authors = [
-    { name = "Nathan Gage", email = "nathan@sweetspot.so" }
+authors = [{ name = "Nathan Gage", email = "nathan@sweetspot.so" }]
+requires-python = ">=3.11"
+dependencies = [
+  "cmarkgfm>=2024.11.20",
+  "fastapi>=0.115.12",
+  "ignoretree>=0.2.0",
+  "uvicorn>=0.34.0",
+  "watchfiles>=1.0.5",
 ]
-requires-python = ">=3.14"
-dependencies = []
+
+[dependency-groups]
+dev = ["httpx>=0.28.1", "pytest>=8.4.0"]
+lint = ["mypy>=1.15.0", "pyright>=1.1.408", "ruff>=0.14.0", "taplo>=0.9.3"]
 
 [project.scripts]
-markserv = "markserv:main"
+markserv = "markserv.cli:main"
+
+[tool.uv]
+default-groups = ["dev", "lint"]
+
+[tool.uv.build-backend]
+package-data = { "markserv" = ["static/*.css", "static/*.LICENSE"] }
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+include = ["src/**/*.py", "tests/**/*.py"]
+
+[tool.ruff.lint]
+extend-select = ["B", "FAST", "I", "Q", "RUF100", "UP"]
+
+[tool.ruff.lint.flake8-quotes]
+inline-quotes = "double"
+multiline-quotes = "double"
+
+[tool.ruff.format]
+docstring-code-format = false
+quote-style = "double"
+
+[tool.pyright]
+pythonVersion = "3.11"
+typeCheckingMode = "standard"
+reportMissingTypeStubs = false
+reportUnnecessaryTypeIgnoreComment = true
+include = ["src", "tests"]
+stubPath = "typings"
+venvPath = "."
+venv = ".venv"
+executionEnvironments = [
+  { root = ".", extraPaths = [
+    "src",
+  ] },
+  { root = "tests", extraPaths = [
+    "src",
+  ] },
+]
+
+[tool.mypy]
+python_version = "3.11"
+files = ["src", "tests"]
+mypy_path = "$MYPY_CONFIG_FILE_DIR/src:$MYPY_CONFIG_FILE_DIR/typings"
+strict = true
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+testpaths = ["tests"]
+xfail_strict = true
+filterwarnings = ["error"]
 
 [build-system]
 requires = ["uv_build>=0.11.2,<0.12.0"]

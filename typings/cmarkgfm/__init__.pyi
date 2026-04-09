@@ -1,0 +1,6 @@
+from .cmark import Options
+
+
+def markdown_to_html(text: str, options: int = 0) -> str: ...
+
+def github_flavored_markdown_to_html(text: str, options: int = 0) -> str: ...
