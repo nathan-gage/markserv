@@ -43,7 +43,8 @@ markserv README.md
 Options:
 
 ```bash
-markserv --host 127.0.0.1 --port 8000 --open docs/
+markserv --host 127.0.0.1 --port 8000 .
+markserv --no-open README.md
 ```
 
 ## Behavior
