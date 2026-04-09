@@ -17,7 +17,8 @@ from rich.console import Console
 from rich.logging import RichHandler
 from uvicorn import Config, Server
 
-from .app import build_config, create_app
+from .app import create_app
+from .site import build_config, build_file_site
 
 
 class StoppableServer(Protocol):
@@ -68,7 +69,7 @@ def browser_url(host: str, port: int) -> str:
     return f"http://{public_host}:{port}"
 
 
-def print_startup_banner(*, source: Path, root_dir: Path, url: str, open_browser: bool) -> None:
+def print_startup_banner(*, source: str, root_dir: str, url: str, open_browser: bool) -> None:
     quit_hint = "Press Q or Esc to quit." if _supports_quit_prompt() else "Press Ctrl+C to quit."
     browser_hint = "Browser opens automatically." if open_browser else "Browser auto-open disabled."
     display_url = url.removeprefix("http://")
@@ -147,6 +148,26 @@ def run_server(server: StoppableServer) -> None:
             listener.join(timeout=0.2)
 
 
+def serve_application(
+    application: Any,
+    *,
+    source: str,
+    root_dir: str,
+    host: str,
+    port: int,
+    open_browser: bool,
+) -> None:
+    configure_logging()
+    url = browser_url(host, port)
+    print_startup_banner(source=source, root_dir=root_dir, url=url, open_browser=open_browser)
+
+    if open_browser:
+        threading.Timer(0.8, lambda: webbrowser.open(url)).start()
+
+    server = create_server(application, host=host, port=port)
+    run_server(server)
+
+
 @app.default
 def serve(
     path: Annotated[
@@ -166,16 +187,16 @@ def serve(
     ] = True,
 ) -> None:
     """Serve GitHub-flavored markdown from a file or directory."""
-    configure_logging()
     config = build_config(path)
-    url = browser_url(host, port)
-    print_startup_banner(source=config.source, root_dir=config.root_dir, url=url, open_browser=open_browser)
-
-    if open_browser:
-        threading.Timer(0.8, lambda: webbrowser.open(url)).start()
-
-    server = create_server(create_app(config), host=host, port=port)
-    run_server(server)
+    site = build_file_site(config)
+    serve_application(
+        create_app(site),
+        source=str(config.source),
+        root_dir=str(config.root_dir),
+        host=host,
+        port=port,
+        open_browser=open_browser,
+    )
 
 
 def main(argv: list[str] | None = None) -> None:

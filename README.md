@@ -40,12 +40,19 @@ Serve a single markdown file:
 markserv README.md
 ```
 
+Run the built-in synthetic demo site:
+
+```bash
+markserv.demo
+```
+
 Options:
 
 ```bash
 markserv .
 markserv --host localhost --port 4422 .
 markserv --no-open README.md
+markserv.demo --no-open --port 9001
 ```
 
 ## Behavior
