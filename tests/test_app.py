@@ -52,10 +52,9 @@ def test_directory_mode_redirects_to_readme_and_hides_gitignored_files(tmp_path:
         assert 'id="github-markdown-light"' in page_response.text
         assert 'id="github-markdown-dark"' in page_response.text
         assert "/public/js/theme.js" in page_response.text
-        assert 'data-theme-select="true"' in page_response.text
-        assert 'value="system"' in page_response.text
-        assert 'value="light"' in page_response.text
-        assert 'value="dark"' in page_response.text
+        assert 'data-theme-btn="system"' in page_response.text
+        assert 'data-theme-btn="light"' in page_response.text
+        assert 'data-theme-btn="dark"' in page_response.text
         assert "/public/vendor/htmx.min.js" in page_response.text
         assert 'hx-trigger="sse:reload"' in page_response.text
         assert "guide" in page_response.text

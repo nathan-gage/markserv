@@ -3,7 +3,7 @@
   const SYSTEM_THEME = "system";
   const LIGHT_THEME = "light";
   const DARK_THEME = "dark";
-  const THEME_SELECT_SELECTOR = "[data-theme-select]";
+  const THEME_BTN_SELECTOR = "[data-theme-btn]";
   const DARK_MODE_QUERY = "(prefers-color-scheme: dark)";
   const THEME_OPTIONS = [SYSTEM_THEME, LIGHT_THEME, DARK_THEME];
 
@@ -45,10 +45,8 @@
   }
 
   function updateThemeControls(preference) {
-    document.querySelectorAll(THEME_SELECT_SELECTOR).forEach((select) => {
-      if (select instanceof HTMLSelectElement) {
-        select.value = preference;
-      }
+    document.querySelectorAll(THEME_BTN_SELECTOR).forEach((btn) => {
+      btn.classList.toggle("is-active", btn.dataset.themeBtn === preference);
     });
   }
 
@@ -77,19 +75,14 @@
     updateThemeControls(themePreference());
   });
 
-  document.addEventListener("change", (event) => {
-    const target = event.target;
-    if (!(target instanceof Element)) {
+  document.addEventListener("click", (event) => {
+    const btn = event.target.closest(THEME_BTN_SELECTOR);
+    if (!btn || !isThemePreference(btn.dataset.themeBtn)) {
       return;
     }
 
-    const select = target.closest(THEME_SELECT_SELECTOR);
-    if (!(select instanceof HTMLSelectElement) || !isThemePreference(select.value)) {
-      return;
-    }
-
-    saveThemePreference(select.value);
-    applyTheme(select.value);
+    saveThemePreference(btn.dataset.themeBtn);
+    applyTheme(btn.dataset.themeBtn);
   });
 
   const mediaQuery = window.matchMedia(DARK_MODE_QUERY);
