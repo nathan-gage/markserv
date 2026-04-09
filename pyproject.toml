@@ -7,6 +7,7 @@ authors = [{ name = "Nathan Gage", email = "nathan@sweetspot.so" }]
 requires-python = ">=3.11"
 dependencies = [
   "cmarkgfm>=2024.11.20",
+  "cyclopts>=4.10.1",
   "fastapi>=0.115.12",
   "ignoretree>=0.2.0",
   "uvicorn>=0.34.0",

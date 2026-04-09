@@ -1,0 +1,60 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+import markserv.cli as cli
+
+
+def test_help_uses_plain_formatter(capsys: pytest.CaptureFixture[str]) -> None:
+    cli.main(["--help"])
+    captured = capsys.readouterr()
+    assert "Usage: markserv [OPTIONS] [ARGS]" in captured.out
+    assert "Arguments:" in captured.out
+    assert "Parameters:" in captured.out
+    assert "╭" not in captured.out
+
+
+def test_cli_parses_options_and_invokes_server(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    markdown_file = tmp_path / "README.md"
+    markdown_file.write_text("# Home\n", encoding="utf-8")
+
+    observed: dict[str, object] = {}
+
+    class ImmediateTimer:
+        def __init__(self, interval: float, function: object) -> None:
+            observed["timer_interval"] = interval
+            observed["timer_function"] = function
+
+        def start(self) -> None:
+            timer_function = observed["timer_function"]
+            assert callable(timer_function)
+            timer_function()
+
+    def fake_open(url: str) -> bool:
+        observed["opened_url"] = url
+        return True
+
+    def fake_create_app(config: object) -> object:
+        observed["config"] = config
+        return {"config": config}
+
+    def fake_run(app: object, *, host: str, port: int, log_level: str) -> None:
+        observed["app"] = app
+        observed["host"] = host
+        observed["port"] = port
+        observed["log_level"] = log_level
+
+    monkeypatch.setattr("markserv.cli.threading.Timer", ImmediateTimer)
+    monkeypatch.setattr("markserv.cli.webbrowser.open", fake_open)
+    monkeypatch.setattr(cli, "create_app", fake_create_app)
+    monkeypatch.setattr("markserv.cli.uvicorn.run", fake_run)
+
+    cli.main([str(markdown_file), "--host", "0.0.0.0", "--port", "9000", "--open"])
+
+    assert observed["host"] == "0.0.0.0"
+    assert observed["port"] == 9000
+    assert observed["log_level"] == "info"
+    assert observed["opened_url"] == "http://0.0.0.0:9000"
+    assert observed["timer_interval"] == 0.8
