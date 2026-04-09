@@ -13,6 +13,7 @@ from typing import Annotated, Any, Protocol
 from cyclopts import App, Parameter
 from cyclopts.help import PlainFormatter
 from cyclopts.token import Token
+from rich.console import Console
 from rich.logging import RichHandler
 from uvicorn import Config, Server
 
@@ -25,7 +26,7 @@ class StoppableServer(Protocol):
     def run(self) -> None: ...
 
 
-logger = logging.getLogger("markserv")
+console = Console(stderr=True)
 QUIT_KEYS = {"q", "Q", "\x1b"}
 DEFAULT_PORT = 4422
 
@@ -54,10 +55,21 @@ def configure_logging() -> None:
                 show_path=False,
                 markup=False,
                 rich_tracebacks=True,
+                console=console,
             )
         ],
         force=True,
     )
+
+
+def print_startup_banner(*, source: Path, root_dir: Path, url: str, open_browser: bool) -> None:
+    quit_hint = "Press Q or Esc to quit." if _supports_quit_prompt() else "Press Ctrl+C to quit."
+    browser_hint = "Browser opens automatically." if open_browser else "Browser auto-open disabled."
+    console.print(f"[bold cyan]markserv[/] serving {source}")
+    console.print(f"[cyan]root[/] {root_dir}")
+    console.print(f"[cyan]url[/] [underline]{url}[/]")
+    console.print(f"[dim]{browser_hint}[/]")
+    console.print(f"[dim]{quit_hint}[/]")
 
 
 def create_server(app: Any, *, host: str, port: int) -> Server:
@@ -80,7 +92,7 @@ def _supports_quit_prompt() -> bool:
 def _request_server_shutdown(server: StoppableServer, stop_event: threading.Event) -> None:
     if stop_event.is_set():
         return
-    logger.info("Stopping server...")
+    console.print("[dim]Stopping server...[/dim]")
     server.should_exit = True
     stop_event.set()
 
@@ -111,7 +123,6 @@ def run_server(server: StoppableServer) -> None:
     listener: threading.Thread | None = None
 
     if _supports_quit_prompt():
-        logger.info("Press Q or Esc to quit.")
         listener = threading.Thread(
             target=_listen_for_quit_keys,
             args=(server, stop_event),
@@ -150,8 +161,7 @@ def serve(
     configure_logging()
     config = build_config(path)
     url = f"http://{host}:{port}"
-    logger.info("Serving %s from %s", config.source, config.root_dir)
-    logger.info("Listening on %s", url)
+    print_startup_banner(source=config.source, root_dir=config.root_dir, url=url, open_browser=open_browser)
 
     if open_browser:
         threading.Timer(0.8, lambda: webbrowser.open(url)).start()
