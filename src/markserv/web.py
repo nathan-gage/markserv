@@ -12,6 +12,7 @@ from fastapi.responses import FileResponse, RedirectResponse, Response, Streamin
 from fasthx.htmy import HTMY
 from watchfiles import awatch
 
+from .icons import generate_favicon
 from .rendering import (
     DocsPageView,
     EmptyPageView,
@@ -163,9 +164,30 @@ def create_app(config_or_site: ServeConfig | SiteSource) -> FastAPI:
 
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
 
+    icon_cache: dict[str, bytes] = {}
+
     @app.get("/public/{asset_path:path}")
     async def public_asset(asset_path: str) -> Response:
         return public_asset_response(asset_path)
+
+    @app.get("/icons/docs/{requested_path:path}")
+    def page_icon(requested_path: str) -> Response:
+        """Generate a per-page favicon. Sync def so FastAPI runs it in a threadpool."""
+        if requested_path in icon_cache:
+            return Response(content=icon_cache[requested_path], media_type="image/png")
+
+        try:
+            rel_path = normalize_rel_path(requested_path)
+        except SitePathError as exc:
+            raise HTTPException(status_code=404, detail="Not found") from exc
+
+        markdown_text = site.read_markdown(rel_path)
+        if markdown_text is None:
+            raise HTTPException(status_code=404, detail="Not found")
+
+        png_bytes = generate_favicon(markdown_text)
+        icon_cache[requested_path] = png_bytes
+        return Response(content=png_bytes, media_type="image/png")
 
     @app.get("/_events")
     async def events() -> StreamingResponse:

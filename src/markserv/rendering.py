@@ -53,6 +53,10 @@ def public_asset_href(rel_path: str) -> str:
     return f"/public/{quote(rel_path, safe='/')}"
 
 
+def icon_href(rel_path: str) -> str:
+    return f"/icons/docs/{quote(rel_path, safe='/')}"
+
+
 def docs_fragment_href(rel_path: str) -> str:
     return f"/_live/docs/{quote(rel_path, safe='/')}"
 
@@ -209,6 +213,7 @@ def docs_shell(view: DocsPageView) -> ComponentType:
         ),
         id="page-shell",
         class_=shell_class,
+        data_icon=icon_href(view.rel_path),
     )
 
 
@@ -240,7 +245,11 @@ def empty_shell(view: EmptyPageView) -> ComponentType:
     )
 
 
-def base_document(title: str, body_content: ComponentType) -> Component:
+def base_document(title: str, body_content: ComponentType, favicon_href: str | None = None) -> Component:
+    favicon: ComponentType = Fragment()
+    if favicon_href is not None:
+        favicon = html.link(rel="icon", type="image/png", href=favicon_href, id="favicon")
+
     return (
         html.DOCTYPE.html,
         html.html(
@@ -248,6 +257,7 @@ def base_document(title: str, body_content: ComponentType) -> Component:
                 html.Meta.charset(),
                 html.Meta.viewport(),
                 html.title(title),
+                favicon,
                 html.link(
                     rel="stylesheet",
                     href=public_asset_href("css/github-markdown-light.css"),
@@ -262,6 +272,7 @@ def base_document(title: str, body_content: ComponentType) -> Component:
                 ),
                 html.link(rel="stylesheet", href=public_asset_href("css/app.css")),
                 html.script(src=public_asset_href("js/theme.js")),
+                html.script(src=public_asset_href("js/favicon.js"), defer=True),
             ),
             html.body(
                 body_content,
@@ -274,7 +285,7 @@ def base_document(title: str, body_content: ComponentType) -> Component:
 
 
 def render_docs_page(view: DocsPageView) -> Component:
-    return base_document(f"{view.title} · markserv", docs_shell(view))
+    return base_document(f"{view.title} · markserv", docs_shell(view), favicon_href=icon_href(view.rel_path))
 
 
 def render_empty_page(view: EmptyPageView) -> Component:
