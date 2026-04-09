@@ -72,7 +72,7 @@ def test_cli_parses_options_and_invokes_server(monkeypatch: pytest.MonkeyPatch, 
     assert observed["host"] == "0.0.0.0"
     assert observed["port"] == 9000
     assert observed["server"] is fake_server
-    assert observed["opened_url"] == "http://0.0.0.0:9000"
+    assert observed["opened_url"] == "http://localhost:9000"
     assert observed["timer_interval"] == 0.8
 
 
@@ -107,7 +107,7 @@ def test_cli_allows_disabling_browser_open(monkeypatch: pytest.MonkeyPatch, tmp_
     cli.main([str(markdown_file), "--no-open"])
 
     assert observed["server"] is fake_server
-    assert observed["host"] == "127.0.0.1"
+    assert observed["host"] == cli.DEFAULT_HOST
     assert observed["port"] == cli.DEFAULT_PORT
 
 

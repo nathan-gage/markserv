@@ -144,10 +144,11 @@ class WatchPathFilter:
             return False
         if rel_path.endswith("/.gitignore") or rel_path == ".gitignore":
             return True
-        return not (
-            self.resolver.is_ignored(rel_path, auto_enter=True)
-            or self.resolver.is_dir_ignored(rel_path, auto_enter=True)
-        )
+        if self.resolver.is_ignored(rel_path, auto_enter=True) or self.resolver.is_dir_ignored(
+            rel_path, auto_enter=True
+        ):
+            return False
+        return is_markdown_path(Path(rel_path))
 
 
 def build_ignore_resolver(root_dir: Path) -> IgnoreResolver:

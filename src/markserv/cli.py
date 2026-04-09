@@ -28,6 +28,7 @@ class StoppableServer(Protocol):
 
 console = Console(stderr=True)
 QUIT_KEYS = {"q", "Q", "\x1b"}
+DEFAULT_HOST = "localhost"
 DEFAULT_PORT = 4422
 
 app = App(
@@ -62,12 +63,19 @@ def configure_logging() -> None:
     )
 
 
+def browser_url(host: str, port: int) -> str:
+    public_host = "localhost" if host in {"127.0.0.1", "0.0.0.0", "localhost"} else host
+    return f"http://{public_host}:{port}"
+
+
 def print_startup_banner(*, source: Path, root_dir: Path, url: str, open_browser: bool) -> None:
     quit_hint = "Press Q or Esc to quit." if _supports_quit_prompt() else "Press Ctrl+C to quit."
     browser_hint = "Browser opens automatically." if open_browser else "Browser auto-open disabled."
+    display_url = url.removeprefix("http://")
+
     console.print(f"[bold cyan]markserv[/] serving {source}")
     console.print(f"[cyan]root[/] {root_dir}")
-    console.print(f"[cyan]url[/] [underline]{url}[/]")
+    console.print(f"[cyan]url[/] [link={url}][underline]{display_url}[/underline][/link]")
     console.print(f"[dim]{browser_hint}[/]")
     console.print(f"[dim]{quit_hint}[/]")
 
@@ -150,7 +158,7 @@ def serve(
     ] = Path("."),
     /,
     *,
-    host: Annotated[str, Parameter(help="Host interface to bind.")] = "127.0.0.1",
+    host: Annotated[str, Parameter(help="Host interface to bind.")] = DEFAULT_HOST,
     port: Annotated[int, Parameter(help="Port to listen on.")] = DEFAULT_PORT,
     open_browser: Annotated[
         bool,
@@ -160,7 +168,7 @@ def serve(
     """Serve GitHub-flavored markdown from a file or directory."""
     configure_logging()
     config = build_config(path)
-    url = f"http://{host}:{port}"
+    url = browser_url(host, port)
     print_startup_banner(source=config.source, root_dir=config.root_dir, url=url, open_browser=open_browser)
 
     if open_browser:

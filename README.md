@@ -43,14 +43,15 @@ markserv README.md
 Options:
 
 ```bash
-markserv --host 127.0.0.1 --port 8000 .
+markserv .
+markserv --host localhost --port 4422 .
 markserv --no-open README.md
 ```
 
 ## Behavior
 
 - Renders common markdown extensions like `.md` and `.markdown`
-- Watches files and reloads the browser when content changes
+- Watches markdown files and reloads the browser when content changes
 - Respects `.gitignore` while scanning so ignored trees like `.venv/` are skipped
 - Serves linked local assets like images from the same file tree
 - In directory mode, shows a sidebar for browsing multiple markdown pages
