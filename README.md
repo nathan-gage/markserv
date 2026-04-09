@@ -6,6 +6,8 @@ It uses:
 
 - [`cmarkgfm`](https://github.com/theacodes/cmarkgfm) for GitHub-flavored markdown rendering
 - [`FastAPI`](https://fastapi.tiangolo.com/) for the local web app
+- [`FastHX`](https://github.com/volfpeter/fasthx) for HTMX-aware FastAPI rendering
+- [`htmy`](https://github.com/volfpeter/htmy) for Python component-based HTML rendering
 - [`github-markdown-css`](https://github.com/sindresorhus/github-markdown-css) for GitHub-like styling
 - [`watchfiles`](https://github.com/samuelcolvin/watchfiles) for live reload
 - [`ignoretree`](https://pypi.org/project/ignoretree/) to respect `.gitignore` rules while scanning
@@ -74,6 +76,9 @@ make all-ci
 ## Notes
 
 - This is intended for plain markdown / GFM-style docs, not MDX.
-- Bundled CSS comes from `github-markdown-css`.
+- UI components are rendered with `htmy` from Python.
 - Front-end assets live under `src/markserv/public/`.
+- Bundled CSS comes from `github-markdown-css`.
+- Bundled HTMX assets are used for SSE-driven live updates.
 - The upstream stylesheet license is included at `src/markserv/public/licenses/github-markdown-css.LICENSE`.
+- The bundled HTMX license is included at `src/markserv/public/licenses/htmx.LICENSE`.

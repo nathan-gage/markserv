@@ -8,6 +8,7 @@ requires-python = ">=3.11"
 dependencies = [
   "cmarkgfm>=2024.11.20",
   "cyclopts>=4.10.1",
+  "fasthx[htmy]>=3.1.0",
   "fastapi>=0.115.12",
   "ignoretree>=0.2.0",
   "uvicorn>=0.34.0",
@@ -25,7 +26,11 @@ markserv = "markserv.cli:main"
 default-groups = ["dev", "lint"]
 
 [tool.uv.build-backend]
-package-data = { "markserv" = ["public/**/*.css", "public/**/*.LICENSE"] }
+package-data = { "markserv" = [
+  "public/**/*.css",
+  "public/**/*.js",
+  "public/**/*.LICENSE",
+] }
 
 [tool.ruff]
 line-length = 120

@@ -30,7 +30,14 @@ def test_directory_mode_redirects_to_readme_and_hides_gitignored_files(tmp_path:
         assert page_response.status_code == 200
         assert "Home · markserv" in page_response.text
         assert "/public/css/app.css" in page_response.text
+        assert "/public/vendor/htmx.min.js" in page_response.text
+        assert 'hx-trigger="sse:reload"' in page_response.text
         assert "guide" in page_response.text
+
+        fragment_response = client.get("/_live/docs/README.md", headers={"HX-Request": "true"})
+        assert fragment_response.status_code == 200
+        assert 'id="page-shell"' in fragment_response.text
+        assert 'hx-swap-oob="true"' in fragment_response.text
 
         asset_response = client.get("/public/css/app.css")
         assert asset_response.status_code == 200
