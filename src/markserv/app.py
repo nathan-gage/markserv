@@ -3,11 +3,11 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import html
+import mimetypes
 import os
 import re
 from collections.abc import AsyncIterator, Iterable
 from dataclasses import dataclass
-from importlib.resources import files
 from pathlib import Path, PurePosixPath
 from typing import Literal, TypeAlias
 from urllib.parse import quote
@@ -25,195 +25,8 @@ DIRECTORY_DEFAULT_BASENAMES = ("README", "readme", "index", "INDEX")
 CMARK_OPTIONS = Options.CMARK_OPT_GITHUB_PRE_LANG | Options.CMARK_OPT_SMART
 NO_CACHE_HEADERS = {"Cache-Control": "no-store"}
 TITLE_RE = re.compile(r"^\s{0,3}#\s+(.+?)\s*$", re.MULTILINE)
-SHELL_CSS = """
-:root {
-  color-scheme: light dark;
-  --bg: #ffffff;
-  --panel: #f6f8fa;
-  --panel-border: #d0d7de;
-  --text: #24292f;
-  --muted: #57606a;
-  --link: #0969da;
-  --active-bg: rgba(9, 105, 218, 0.10);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0d1117;
-    --panel: #161b22;
-    --panel-border: #30363d;
-    --text: #e6edf3;
-    --muted: #8b949e;
-    --link: #58a6ff;
-    --active-bg: rgba(88, 166, 255, 0.14);
-  }
-}
-
-* {
-  box-sizing: border-box;
-}
-
-html,
-body {
-  margin: 0;
-  min-height: 100%;
-  background: var(--bg);
-  color: var(--text);
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-}
-
-body {
-  min-height: 100vh;
-}
-
-.app-shell {
-  display: grid;
-  min-height: 100vh;
-}
-
-.app-shell.with-sidebar {
-  grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
-}
-
-.sidebar {
-  position: sticky;
-  top: 0;
-  align-self: start;
-  height: 100vh;
-  overflow-y: auto;
-  border-right: 1px solid var(--panel-border);
-  background: var(--panel);
-  padding: 1rem;
-}
-
-.sidebar-header {
-  margin-bottom: 1rem;
-}
-
-.sidebar-title {
-  margin: 0;
-  font-size: 0.95rem;
-  font-weight: 700;
-}
-
-.sidebar-subtitle {
-  margin: 0.35rem 0 0;
-  color: var(--muted);
-  font-size: 0.8rem;
-  word-break: break-word;
-}
-
-.home-link {
-  display: inline-flex;
-  margin-top: 0.75rem;
-  color: var(--link);
-  text-decoration: none;
-  font-size: 0.85rem;
-}
-
-.nav-tree,
-.nav-tree ul {
-  list-style: none;
-  margin: 0;
-  padding-left: 0.9rem;
-}
-
-.nav-tree {
-  padding-left: 0;
-}
-
-.nav-dir {
-  margin: 0.2rem 0;
-}
-
-.nav-dir > details > summary {
-  cursor: pointer;
-  color: var(--muted);
-  font-size: 0.9rem;
-  user-select: none;
-}
-
-.nav-link {
-  display: block;
-  margin: 0.15rem 0;
-  padding: 0.35rem 0.55rem;
-  border-radius: 0.45rem;
-  color: inherit;
-  text-decoration: none;
-  font-size: 0.92rem;
-}
-
-.nav-link:hover {
-  background: rgba(127, 127, 127, 0.08);
-}
-
-.nav-link.is-active {
-  background: var(--active-bg);
-  color: var(--link);
-  font-weight: 600;
-}
-
-.main {
-  min-width: 0;
-}
-
-.content-header {
-  padding: 1rem 1.25rem 0;
-  color: var(--muted);
-  font-size: 0.85rem;
-}
-
-.markdown-frame {
-  padding: 0 1.25rem 2rem;
-}
-
-.markdown-body {
-  box-sizing: border-box;
-  min-width: 200px;
-  max-width: 980px;
-  margin: 0 auto;
-  padding: 2rem 2.25rem 3rem;
-}
-
-.empty-state {
-  max-width: 720px;
-  margin: 4rem auto;
-  padding: 0 1.25rem;
-}
-
-.empty-state h1 {
-  margin-bottom: 0.5rem;
-}
-
-.empty-state p,
-.empty-state li {
-  color: var(--muted);
-  line-height: 1.6;
-}
-
-@media (max-width: 900px) {
-  .app-shell.with-sidebar {
-    grid-template-columns: 1fr;
-  }
-
-  .sidebar {
-    position: relative;
-    height: auto;
-    border-right: none;
-    border-bottom: 1px solid var(--panel-border);
-  }
-}
-
-@media (max-width: 767px) {
-  .markdown-frame {
-    padding: 0 0 1.5rem;
-  }
-
-  .markdown-body {
-    padding: 1rem 1rem 2rem;
-  }
-}
-""".strip()
+PACKAGE_DIR = Path(__file__).resolve().parent
+PUBLIC_DIR = PACKAGE_DIR / "public"
 
 
 @dataclass(frozen=True)
@@ -429,10 +242,25 @@ def resolve_site_path(root_dir: Path, rel_path: str) -> Path:
     return resolved
 
 
-def asset_text(name: str) -> str:
-    if name not in {"github-markdown-light.css", "github-markdown-dark.css"}:
+def public_asset_href(rel_path: str) -> str:
+    return f"/public/{quote(rel_path, safe='/')}"
+
+
+def public_asset_response(asset_path: str) -> Response:
+    normalized_path = normalize_rel_path(asset_path)
+    if not normalized_path:
         raise HTTPException(status_code=404, detail="Asset not found")
-    return files("markserv").joinpath("static").joinpath(name).read_text(encoding="utf-8")
+
+    target = resolve_site_path(PUBLIC_DIR, normalized_path)
+    if not target.exists() or not target.is_file():
+        raise HTTPException(status_code=404, detail="Asset not found")
+
+    media_type, _encoding = mimetypes.guess_type(target.name)
+    return Response(
+        target.read_bytes(),
+        media_type=media_type or "application/octet-stream",
+        headers=NO_CACHE_HEADERS,
+    )
 
 
 def render_markdown(markdown_text: str) -> str:
@@ -523,9 +351,9 @@ def render_page_html(
     <meta charset=\"utf-8\">
     <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
     <title>{html.escape(title)} · markserv</title>
-    <link rel=\"stylesheet\" href=\"/_static/github-markdown-light.css\" media=\"(prefers-color-scheme: light), (prefers-color-scheme: no-preference)\">
-    <link rel=\"stylesheet\" href=\"/_static/github-markdown-dark.css\" media=\"(prefers-color-scheme: dark)\">
-    <style>{SHELL_CSS}</style>
+    <link rel=\"stylesheet\" href=\"{public_asset_href("css/github-markdown-light.css")}\" media=\"(prefers-color-scheme: light), (prefers-color-scheme: no-preference)\">
+    <link rel=\"stylesheet\" href=\"{public_asset_href("css/github-markdown-dark.css")}\" media=\"(prefers-color-scheme: dark)\">
+    <link rel=\"stylesheet\" href=\"{public_asset_href("css/app.css")}\">
   </head>
   <body>
     <div class=\"{shell_class}\">
@@ -555,7 +383,7 @@ def render_empty_html(config: ServeConfig) -> str:
     <meta charset=\"utf-8\">
     <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
     <title>markserv</title>
-    <style>{SHELL_CSS}</style>
+    <link rel=\"stylesheet\" href=\"{public_asset_href("css/app.css")}\">
   </head>
   <body>
     <main class=\"empty-state\">
@@ -606,9 +434,9 @@ def create_app(config: ServeConfig) -> FastAPI:
 
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
 
-    @app.get("/_static/{name}")
-    async def static_asset(name: str) -> Response:
-        return Response(asset_text(name), media_type="text/css", headers=NO_CACHE_HEADERS)
+    @app.get("/public/{asset_path:path}")
+    async def public_asset(asset_path: str) -> Response:
+        return public_asset_response(asset_path)
 
     @app.get("/_events")
     async def events() -> StreamingResponse:

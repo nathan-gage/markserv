@@ -29,7 +29,12 @@ def test_directory_mode_redirects_to_readme_and_hides_gitignored_files(tmp_path:
         page_response = client.get("/docs/README.md")
         assert page_response.status_code == 200
         assert "Home · markserv" in page_response.text
+        assert "/public/css/app.css" in page_response.text
         assert "guide" in page_response.text
+
+        asset_response = client.get("/public/css/app.css")
+        assert asset_response.status_code == 200
+        assert asset_response.headers["content-type"].startswith("text/css")
 
         ignored_response = client.get("/docs/.venv/ignored.md")
         assert ignored_response.status_code == 404

@@ -24,7 +24,7 @@ markserv = "markserv.cli:main"
 default-groups = ["dev", "lint"]
 
 [tool.uv.build-backend]
-package-data = { "markserv" = ["static/*.css", "static/*.LICENSE"] }
+package-data = { "markserv" = ["public/**/*.css", "public/**/*.LICENSE"] }
 
 [tool.ruff]
 line-length = 120

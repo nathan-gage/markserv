@@ -75,4 +75,5 @@ make all-ci
 
 - This is intended for plain markdown / GFM-style docs, not MDX.
 - Bundled CSS comes from `github-markdown-css`.
-- The upstream stylesheet license is included at `src/markserv/static/github-markdown-css.LICENSE`.
+- Front-end assets live under `src/markserv/public/`.
+- The upstream stylesheet license is included at `src/markserv/public/licenses/github-markdown-css.LICENSE`.
