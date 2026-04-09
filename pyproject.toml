@@ -1,0 +1,17 @@
+[project]
+name = "markserv"
+version = "0.1.0"
+description = "CLI tool for serving markdown"
+readme = "README.md"
+authors = [
+    { name = "Nathan Gage", email = "nathan@sweetspot.so" }
+]
+requires-python = ">=3.14"
+dependencies = []
+
+[project.scripts]
+markserv = "markserv:main"
+
+[build-system]
+requires = ["uv_build>=0.11.2,<0.12.0"]
+build-backend = "uv_build"
