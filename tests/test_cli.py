@@ -1,10 +1,20 @@
 from __future__ import annotations
 
+import threading
 from pathlib import Path
 
 import pytest
 
 import markserv.cli as cli
+
+
+class FakeServer:
+    def __init__(self) -> None:
+        self.should_exit = False
+        self.run_called = False
+
+    def run(self) -> None:
+        self.run_called = True
 
 
 def test_help_uses_plain_formatter(capsys: pytest.CaptureFixture[str]) -> None:
@@ -22,6 +32,7 @@ def test_cli_parses_options_and_invokes_server(monkeypatch: pytest.MonkeyPatch, 
     markdown_file.write_text("# Home\n", encoding="utf-8")
 
     observed: dict[str, object] = {}
+    fake_server = FakeServer()
 
     class ImmediateTimer:
         def __init__(self, interval: float, function: object) -> None:
@@ -41,34 +52,26 @@ def test_cli_parses_options_and_invokes_server(monkeypatch: pytest.MonkeyPatch, 
         observed["config"] = config
         return {"config": config}
 
-    def fake_run(
-        app: object,
-        *,
-        host: str,
-        port: int,
-        log_level: str,
-        access_log: bool,
-        log_config: object,
-    ) -> None:
+    def fake_create_server(app: object, *, host: str, port: int) -> FakeServer:
         observed["app"] = app
         observed["host"] = host
         observed["port"] = port
-        observed["log_level"] = log_level
-        observed["access_log"] = access_log
-        observed["log_config"] = log_config
+        return fake_server
+
+    def fake_run_server(server: object) -> None:
+        observed["server"] = server
 
     monkeypatch.setattr("markserv.cli.threading.Timer", ImmediateTimer)
     monkeypatch.setattr("markserv.cli.webbrowser.open", fake_open)
     monkeypatch.setattr(cli, "create_app", fake_create_app)
-    monkeypatch.setattr("markserv.cli.uvicorn.run", fake_run)
+    monkeypatch.setattr(cli, "create_server", fake_create_server)
+    monkeypatch.setattr(cli, "run_server", fake_run_server)
 
     cli.main([str(markdown_file), "--host", "0.0.0.0", "--port", "9000"])
 
     assert observed["host"] == "0.0.0.0"
     assert observed["port"] == 9000
-    assert observed["log_level"] == "warning"
-    assert observed["access_log"] is False
-    assert observed["log_config"] is None
+    assert observed["server"] is fake_server
     assert observed["opened_url"] == "http://0.0.0.0:9000"
     assert observed["timer_interval"] == 0.8
 
@@ -78,6 +81,7 @@ def test_cli_allows_disabling_browser_open(monkeypatch: pytest.MonkeyPatch, tmp_
     markdown_file.write_text("# Home\n", encoding="utf-8")
 
     observed: dict[str, object] = {}
+    fake_server = FakeServer()
 
     def fail_timer(_interval: float, _function: object) -> object:
         raise AssertionError("Timer should not be created when --no-open is passed")
@@ -86,16 +90,32 @@ def test_cli_allows_disabling_browser_open(monkeypatch: pytest.MonkeyPatch, tmp_
         observed["config"] = config
         return {"config": config}
 
-    def fake_run(app: object, **kwargs: object) -> None:
+    def fake_create_server(app: object, *, host: str, port: int) -> FakeServer:
         observed["app"] = app
-        observed.update(kwargs)
+        observed["host"] = host
+        observed["port"] = port
+        return fake_server
+
+    def fake_run_server(server: object) -> None:
+        observed["server"] = server
 
     monkeypatch.setattr("markserv.cli.threading.Timer", fail_timer)
     monkeypatch.setattr(cli, "create_app", fake_create_app)
-    monkeypatch.setattr("markserv.cli.webbrowser.open", lambda _url: True)
-    monkeypatch.setattr("markserv.cli.uvicorn.run", fake_run)
+    monkeypatch.setattr(cli, "create_server", fake_create_server)
+    monkeypatch.setattr(cli, "run_server", fake_run_server)
 
     cli.main([str(markdown_file), "--no-open"])
 
+    assert observed["server"] is fake_server
     assert observed["host"] == "127.0.0.1"
-    assert observed["port"] == 8000
+    assert observed["port"] == cli.DEFAULT_PORT
+
+
+def test_request_server_shutdown_marks_server_and_event() -> None:
+    server = FakeServer()
+    stop_event = threading.Event()
+
+    cli._request_server_shutdown(server, stop_event)
+
+    assert server.should_exit is True
+    assert stop_event.is_set()
