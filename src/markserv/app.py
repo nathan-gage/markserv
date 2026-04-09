@@ -477,6 +477,21 @@ def render_nav_items(items: tuple[NavNode, ...]) -> ComponentType:
     )
 
 
+def theme_picker() -> ComponentType:
+    return html.label(
+        html.span("Theme", class_="theme-picker-label"),
+        html.select(
+            html.option("System", value="system"),
+            html.option("Light", value="light"),
+            html.option("Dark", value="dark"),
+            class_="theme-picker-select",
+            data_theme_select="true",
+            aria_label="Color theme",
+        ),
+        class_="theme-picker",
+    )
+
+
 def docs_shell(view: DocsPageView) -> ComponentType:
     sidebar: ComponentType = Fragment()
     if view.with_sidebar:
@@ -500,7 +515,11 @@ def docs_shell(view: DocsPageView) -> ComponentType:
         sse_reload_listener(view.live_fragment_href),
         sidebar,
         html.main(
-            html.div(view.rel_path, class_="content-header"),
+            html.div(
+                html.span(view.rel_path, class_="content-path"),
+                theme_picker(),
+                class_="content-header",
+            ),
             html.div(
                 html.article(SafeStr(view.rendered_markdown), class_="markdown-body"),
                 class_="markdown-frame",
@@ -515,7 +534,11 @@ def docs_shell(view: DocsPageView) -> ComponentType:
 def empty_shell(view: EmptyPageView) -> ComponentType:
     return html.main(
         sse_reload_listener(view.live_fragment_href),
-        html.h1("No markdown files found"),
+        html.div(
+            html.h1("No markdown files found"),
+            theme_picker(),
+            class_="empty-state-header",
+        ),
         html.p(
             "markserv scanned ",
             html.code(view.root_dir),
@@ -548,13 +571,16 @@ def base_document(title: str, body_content: ComponentType) -> Component:
                     rel="stylesheet",
                     href=public_asset_href("css/github-markdown-light.css"),
                     media="(prefers-color-scheme: light), (prefers-color-scheme: no-preference)",
+                    id="github-markdown-light",
                 ),
                 html.link(
                     rel="stylesheet",
                     href=public_asset_href("css/github-markdown-dark.css"),
                     media="(prefers-color-scheme: dark)",
+                    id="github-markdown-dark",
                 ),
                 html.link(rel="stylesheet", href=public_asset_href("css/app.css")),
+                html.script(src=public_asset_href("js/theme.js")),
             ),
             html.body(
                 body_content,

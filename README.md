@@ -55,6 +55,7 @@ markserv --no-open README.md
 - Respects `.gitignore` while scanning so ignored trees like `.venv/` are skipped
 - Serves linked local assets like images from the same file tree
 - In directory mode, shows a sidebar for browsing multiple markdown pages
+- Includes a system/light/dark theme control that remembers your choice in browser storage
 
 ## Development
 

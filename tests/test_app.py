@@ -47,6 +47,15 @@ def test_directory_mode_redirects_to_readme_and_hides_gitignored_files(tmp_path:
         assert page_response.status_code == 200
         assert "Home · markserv" in page_response.text
         assert "/public/css/app.css" in page_response.text
+        assert "/public/css/github-markdown-light.css" in page_response.text
+        assert "/public/css/github-markdown-dark.css" in page_response.text
+        assert 'id="github-markdown-light"' in page_response.text
+        assert 'id="github-markdown-dark"' in page_response.text
+        assert "/public/js/theme.js" in page_response.text
+        assert 'data-theme-select="true"' in page_response.text
+        assert 'value="system"' in page_response.text
+        assert 'value="light"' in page_response.text
+        assert 'value="dark"' in page_response.text
         assert "/public/vendor/htmx.min.js" in page_response.text
         assert 'hx-trigger="sse:reload"' in page_response.text
         assert "guide" in page_response.text
@@ -59,6 +68,11 @@ def test_directory_mode_redirects_to_readme_and_hides_gitignored_files(tmp_path:
         asset_response = client.get("/public/css/app.css")
         assert asset_response.status_code == 200
         assert asset_response.headers["content-type"].startswith("text/css")
+
+        theme_asset_response = client.get("/public/js/theme.js")
+        assert theme_asset_response.status_code == 200
+        assert "markserv-theme" in theme_asset_response.text
+        assert 'const SYSTEM_THEME = "system"' in theme_asset_response.text
 
         ignored_response = client.get("/docs/.venv/ignored.md")
         assert ignored_response.status_code == 404
