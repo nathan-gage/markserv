@@ -574,7 +574,6 @@ wheels = [
 
 [[package]]
 name = "markserv"
-version = "1.1.2"
 source = { editable = "." }
 dependencies = [
     { name = "cmarkgfm" },
