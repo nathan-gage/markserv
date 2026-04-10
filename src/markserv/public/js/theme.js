@@ -80,14 +80,31 @@
     updateThemeControls(themePreference());
   });
 
+  let transitionTimer = null;
+  const TRANSITION_CLASSES = ["theme-to-light", "theme-to-dark"];
+
+  function enableTransition(toTheme) {
+    if (transitionTimer) clearTimeout(transitionTimer);
+    const cls = toTheme === DARK_THEME ? "theme-to-dark" : "theme-to-light";
+    document.documentElement.classList.remove(...TRANSITION_CLASSES);
+    document.documentElement.classList.add(cls);
+    const duration = 1300;
+    transitionTimer = setTimeout(() => {
+      document.documentElement.classList.remove(cls);
+      transitionTimer = null;
+    }, duration);
+  }
+
   document.addEventListener("click", (event) => {
     const btn = event.target.closest(THEME_BTN_SELECTOR);
     if (!btn || !isThemePreference(btn.dataset.themeBtn)) {
       return;
     }
 
-    saveThemePreference(btn.dataset.themeBtn);
-    applyTheme(btn.dataset.themeBtn);
+    const pref = btn.dataset.themeBtn;
+    enableTransition(resolvedTheme(pref));
+    saveThemePreference(pref);
+    applyTheme(pref);
   });
 
   const mediaQuery = window.matchMedia(DARK_MODE_QUERY);
