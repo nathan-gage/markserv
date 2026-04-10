@@ -141,9 +141,28 @@ def _flatten_nav(items: tuple[NavNode, ...]) -> list[NavFile]:
     return result
 
 
+def _live_fragment_href_for_docs_href(href: str) -> str | None:
+    prefix = "/docs/"
+    if not href.startswith(prefix):
+        return None
+    return f"/_live/docs/{href.removeprefix(prefix)}"
+
+
+def _live_nav_attrs(href: str) -> dict[str, str]:
+    live_href = _live_fragment_href_for_docs_href(href)
+    if live_href is None:
+        return {}
+    return {
+        "hx_get": live_href,
+        "hx_target": "#page-shell",
+        "hx_swap": "outerHTML",
+        "hx_push_url": "true",
+    }
+
+
 def _nav_link(nav_file: NavFile) -> ComponentType:
     cls = "nav-link is-active" if nav_file.active else "nav-link"
-    return html.a(nav_file.label, href=nav_file.href, class_=cls)
+    return html.a(nav_file.label, href=nav_file.href, class_=cls, **_live_nav_attrs(nav_file.href))
 
 
 def _render_section_children(children: tuple[NavNode, ...], group: list[ComponentType]) -> None:
@@ -290,7 +309,9 @@ def docs_shell(view: DocsPageView) -> ComponentType:
     if view.with_sidebar:
         title: ComponentType
         if view.home_href is not None:
-            title = html.a(view.config_name, href=view.home_href, class_="sidebar-title")
+            title = html.a(
+                view.config_name, href=view.home_href, class_="sidebar-title", **_live_nav_attrs(view.home_href)
+            )
         else:
             title = html.span(view.config_name, class_="sidebar-title")
 
@@ -431,6 +452,7 @@ def base_document(
                 html.script(src=public_asset_href("js/sidebar.js")),
                 html.script(src=public_asset_href("js/clipboard.js")),
                 html.script(src=public_asset_href("js/favicon.js"), defer=True),
+                html.script(src=public_asset_href("js/live-reload.js"), defer=True),
                 html.script(src=public_asset_href("js/dev-reload.js"), defer=True) if dev_reload else Fragment(),
             ),
             html.body(

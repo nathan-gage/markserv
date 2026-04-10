@@ -6,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from markserv.app import WatchPathFilter, build_config, create_app
+from markserv.site import MarkdownPage, PageIndex
 from markserv.web import is_dev_reload_asset
 
 
@@ -57,6 +58,48 @@ def test_python_reload_mode_includes_dev_reload_client(monkeypatch: pytest.Monke
         assert 'data-dev-reload="true"' in page_response.text
 
 
+def test_page_index_is_cached_across_requests() -> None:
+    class CountingSite:
+        name: str = "docs"
+        root_label: str = "/virtual/docs"
+        default_doc: str | None = None
+        show_navigation: bool = True
+        watch_root: Path | None = None
+        watch_filter: WatchPathFilter | None = None
+
+        def __init__(self) -> None:
+            self.page_index_calls = 0
+            self._page_index = PageIndex((MarkdownPage(rel_path="README.md", label="Home"),))
+
+        def page_index(self) -> PageIndex:
+            self.page_index_calls += 1
+            return self._page_index
+
+        def read_markdown(self, rel_path: str) -> str | None:
+            return "# Home\n" if rel_path == "README.md" else None
+
+        def resolve_asset(self, rel_path: str) -> Path | None:
+            return None
+
+        def is_directory(self, rel_path: str) -> bool:
+            return False
+
+    site = CountingSite()
+
+    with TestClient(create_app(site)) as client:
+        root_response = client.get("/", follow_redirects=False)
+        assert root_response.status_code == 307
+        assert root_response.headers["location"] == "/docs/README.md"
+
+        page_response = client.get("/docs/README.md")
+        assert page_response.status_code == 200
+
+        fragment_response = client.get("/_live/docs/README.md", headers={"HX-Request": "true"})
+        assert fragment_response.status_code == 200
+
+    assert site.page_index_calls == 1
+
+
 def test_directory_mode_redirects_to_readme_and_hides_gitignored_files(tmp_path: Path) -> None:
     docs_root = tmp_path / "docs"
     write_text(docs_root / ".gitignore", ".venv/\n")
@@ -84,6 +127,7 @@ def test_directory_mode_redirects_to_readme_and_hides_gitignored_files(tmp_path:
         assert 'id="pygments-light"' in page_response.text
         assert 'id="pygments-dark"' in page_response.text
         assert "/public/js/theme.js" in page_response.text
+        assert "/public/js/live-reload.js" in page_response.text
         assert 'data-theme-btn="system"' in page_response.text
         assert 'data-theme-btn="light"' in page_response.text
         assert 'data-theme-btn="dark"' in page_response.text
@@ -92,6 +136,9 @@ def test_directory_mode_redirects_to_readme_and_hides_gitignored_files(tmp_path:
         assert "hit-area-x-2" in page_response.text
         assert "/public/vendor/htmx.min.js" in page_response.text
         assert 'hx-trigger="sse:reload"' in page_response.text
+        assert 'hx-get="/_live/docs/guide.md"' in page_response.text
+        assert 'hx-push-url="true"' in page_response.text
+        assert 'href="/docs/guide.md"' in page_response.text
         assert "guide" in page_response.text
 
         fragment_response = client.get("/_live/docs/README.md", headers={"HX-Request": "true"})
