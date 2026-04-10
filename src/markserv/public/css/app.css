@@ -132,7 +132,8 @@ body {
   display: flex;
   align-items: center;
   gap: 0.25rem;
-  padding-left: 1.75rem;
+  padding-left: 2.1rem;
+  padding-top: 0.1rem;
 }
 
 .sidebar-title {
@@ -155,14 +156,29 @@ a.sidebar-title:hover {
 
 .sidebar-path {
   padding: 0 0.55rem 0.5rem;
-  font-size: 0.68rem;
+  font-size: 0.78rem;
   color: var(--muted);
   opacity: 0.6;
+  border-bottom: 1px solid var(--panel-border);
+  margin-bottom: 0.5rem;
+}
+
+.sidebar-path .content-path-group {
+  border: none;
+  padding: 0;
+  gap: 0.2rem;
+}
+
+.sidebar-path-text {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  border-bottom: 1px solid var(--panel-border);
-  margin-bottom: 0.5rem;
+  min-width: 0;
+}
+
+.copy-btn-sm {
+  width: 22px;
+  height: 22px;
 }
 
 .nav-list {
@@ -237,15 +253,14 @@ a.sidebar-title:hover {
 .content-header {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  padding: 1rem 1.25rem 0;
+  padding: 0.6rem 1.25rem 0;
   color: var(--muted);
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   transition: padding-left 0.38s cubic-bezier(0.08, 0.82, 0.18, 1);
 }
 
 .sidebar-collapsed .content-header {
-  padding-left: 3rem;
+  padding-left: 2.6rem;
 }
 
 .empty-state-header {
@@ -255,9 +270,69 @@ a.sidebar-title:hover {
   gap: 1rem;
 }
 
+.content-path-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+  cursor: pointer;
+  padding: 0.15rem 0.15rem 0.15rem 0.5rem;
+  border-radius: 0.35rem;
+  border: 1px solid transparent;
+  transition: border-color 0.15s;
+}
+
+.content-path-group:hover {
+  border-color: var(--panel-border);
+}
+
 .content-path {
   min-width: 0;
   overflow-wrap: anywhere;
+  font-size: 0.85rem;
+}
+
+.copy-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 0.35rem;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.3s, background 0.15s;
+}
+
+.content-path-group:hover .copy-btn {
+  opacity: 1;
+}
+
+.copy-btn:hover {
+  background: rgb(127 127 127 / 12%);
+  color: var(--text);
+}
+
+.copy-btn.is-copied {
+  opacity: 1;
+  color: #2ea043;
+}
+
+.copy-icon-check {
+  display: none;
+}
+
+.copy-btn.is-copied .copy-icon-default {
+  display: none;
+}
+
+.copy-btn.is-copied .copy-icon-check {
+  display: inline;
 }
 
 .markdown-frame {

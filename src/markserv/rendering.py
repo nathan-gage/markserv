@@ -203,6 +203,19 @@ _ICON_SIDEBAR_OPEN = (
     '<rect width="18" height="18" x="3" y="3" rx="2"/>'
     '<path d="M9 3v18"/><path d="m14 9 3 3-3 3"/></svg>'
 )
+_ICON_CLIPBOARD = (
+    '<svg class="copy-icon copy-icon-default" width="14" height="14" viewBox="0 0 24 24" fill="none"'
+    ' stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    '<rect width="8" height="4" x="8" y="2" rx="1" ry="1"/>'
+    '<path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>'
+)
+_ICON_CLIPBOARD_CHECK = (
+    '<svg class="copy-icon copy-icon-check" width="14" height="14" viewBox="0 0 24 24" fill="none"'
+    ' stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    '<rect width="8" height="4" x="8" y="2" rx="1" ry="1"/>'
+    '<path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>'
+    '<path d="m9 14 2 2 4-4"/></svg>'
+)
 
 
 def theme_picker() -> ComponentType:
@@ -251,7 +264,22 @@ def docs_shell(view: DocsPageView) -> ComponentType:
         toggle_btn = _sidebar_toggle_btn()
         sidebar = html.aside(
             html.div(title, class_="sidebar-header"),
-            html.div(view.root_dir, class_="sidebar-path"),
+            html.div(
+                html.div(
+                    html.span(view.root_dir, class_="sidebar-path-text"),
+                    html.button(
+                        SafeStr(_ICON_CLIPBOARD),
+                        SafeStr(_ICON_CLIPBOARD_CHECK),
+                        type="button",
+                        class_="copy-btn copy-btn-sm",
+                        data_copy_text=view.root_dir,
+                        aria_label="Copy path",
+                        title="Copy path",
+                    ),
+                    class_="content-path-group",
+                ),
+                class_="sidebar-path",
+            ),
             render_nav_items(view.nav_items),
             html.div(
                 theme_picker(),
@@ -268,7 +296,19 @@ def docs_shell(view: DocsPageView) -> ComponentType:
         sidebar,
         html.main(
             html.div(
-                html.span(view.rel_path, class_="content-path"),
+                html.div(
+                    html.span(view.rel_path, class_="content-path"),
+                    html.button(
+                        SafeStr(_ICON_CLIPBOARD),
+                        SafeStr(_ICON_CLIPBOARD_CHECK),
+                        type="button",
+                        class_="copy-btn",
+                        data_copy_text=view.rel_path,
+                        aria_label="Copy file path",
+                        title="Copy file path",
+                    ),
+                    class_="content-path-group",
+                ),
                 class_="content-header",
             ),
             html.div(
@@ -339,6 +379,7 @@ def base_document(title: str, body_content: ComponentType, favicon_href: str | N
                 html.link(rel="stylesheet", href=public_asset_href("css/app.css")),
                 html.script(src=public_asset_href("js/theme.js")),
                 html.script(src=public_asset_href("js/sidebar.js")),
+                html.script(src=public_asset_href("js/clipboard.js")),
                 html.script(src=public_asset_href("js/favicon.js"), defer=True),
             ),
             html.body(
