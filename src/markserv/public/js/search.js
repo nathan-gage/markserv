@@ -10,6 +10,7 @@
   let pageRequestInFlight = false;
   let pendingOpenAfterSwap = false;
   let activeTransition = null;
+  let activeTransitionTimer = null;
 
   const isMac = /mac|iphone|ipad/i.test(
     navigator.userAgentData?.platform || navigator.platform || ""
@@ -31,27 +32,41 @@
     });
   }
 
-  function transition(root, update) {
-    const run =
-      typeof root?.startViewTransition === "function"
-        ? () => root.startViewTransition({ callback: update })
-        : typeof document.startViewTransition === "function"
-          ? () => document.startViewTransition(update)
-          : null;
+  function clearTransitionState(viewTransition) {
+    if (activeTransitionTimer) {
+      clearTimeout(activeTransitionTimer);
+      activeTransitionTimer = null;
+    }
+    if (activeTransition === viewTransition) {
+      activeTransition = null;
+    }
+  }
 
-    if (!run || pageRequestInFlight || activeTransition) {
+  function stopActiveTransition() {
+    if (!activeTransition) return;
+    try {
+      activeTransition.skipTransition?.();
+    } catch {}
+    clearTransitionState(activeTransition);
+  }
+
+  function transition(update) {
+    if (!document.startViewTransition || pageRequestInFlight || activeTransition) {
       update();
       return null;
     }
 
     try {
-      const viewTransition = run();
+      const viewTransition = document.startViewTransition(update);
       if (viewTransition?.finished?.finally) {
         activeTransition = viewTransition;
-        viewTransition.finished.finally(() => {
+        activeTransitionTimer = window.setTimeout(() => {
           if (activeTransition === viewTransition) {
-            activeTransition = null;
+            stopActiveTransition();
           }
+        }, 1000);
+        viewTransition.finished.finally(() => {
+          clearTransitionState(viewTransition);
         });
       }
       return viewTransition;
@@ -95,7 +110,7 @@
       return;
     }
     pendingOpenAfterSwap = false;
-    transition(d, () => d.showModal());
+    transition(() => d.showModal());
     focusSearchInput(d);
   }
 
@@ -103,7 +118,7 @@
     if (!d) return;
     pendingOpenAfterSwap = false;
     if (d.open) {
-      if (animate) transition(d, () => d.close());
+      if (animate) transition(() => d.close());
       else d.close();
     }
     resetSearch(d, { clearQuery });
@@ -146,6 +161,7 @@
     "pointerdown",
     (e) => {
       if (e.target.closest?.(RESULT) || isPageShellNavigationTarget(e.target)) {
+        stopActiveTransition();
         closeSearch(dialog(), { clearQuery: true, animate: false });
       }
     },
@@ -227,6 +243,7 @@
     const target = e.detail?.target;
     if (isPageShellTarget(target)) {
       pageRequestInFlight = true;
+      stopActiveTransition();
       closeSearch(dialog(), { clearQuery: true, animate: false });
     }
   });
@@ -279,6 +296,7 @@
   });
 
   window.addEventListener("pagehide", () => {
+    stopActiveTransition();
     closeSearch(dialog(), { clearQuery: true, animate: false });
   });
 
