@@ -32,7 +32,7 @@ jobs:
               return
             }
 
-            const allowedLabels = ['enhancement', 'bug', 'documentation']
+            const allowedLabels = ['enhancement', 'bug', 'documentation', 'dependencies']
             const labelNames = pr.labels.map((label) => label.name)
             const matchedLabels = labelNames.filter((label) => allowedLabels.includes(label))
             const errors = []

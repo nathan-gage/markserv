@@ -11,7 +11,7 @@ Delete this section if the change is not user-visible.
 ## Checklist
 
 - [ ] PR title is user-facing and release-note quality
-- [ ] I added exactly one of: `enhancement`, `bug`, or `documentation`
+- [ ] I added exactly one of: `enhancement`, `bug`, `documentation`, or `dependencies`
 - [ ] I ran relevant local checks, or this change does not need them
 - [ ] I added or updated tests when appropriate
 - [ ] Docs updated if needed
