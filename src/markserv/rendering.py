@@ -406,8 +406,7 @@ def empty_shell(view: EmptyPageView) -> ComponentType:
 def search_chrome() -> ComponentType:
     return Fragment(
         html.button(
-            SafeStr(_ICON_SEARCH),
-            html.span("Search", class_="search-trigger-label"),
+            html.span(SafeStr(_ICON_SEARCH), class_="search-trigger-icon"),
             html.span("Cmd/Ctrl K", class_="search-trigger-shortcut", data_search_shortcut=""),
             type="button",
             class_="search-trigger",
@@ -434,15 +433,12 @@ def search_chrome() -> ComponentType:
                         hx_target="[data-search-results]",
                         hx_swap="innerHTML",
                     ),
-                    html.form(
-                        html.button(
-                            "Esc",
-                            type="submit",
-                            class_="search-close hit-area-1",
-                            aria_label="Close search",
-                        ),
-                        method="dialog",
-                        class_="search-close-form",
+                    html.button(
+                        "Esc",
+                        type="button",
+                        class_="search-close hit-area-1",
+                        data_search_close="",
+                        aria_label="Close search",
                     ),
                     class_="search-modal-header",
                 ),

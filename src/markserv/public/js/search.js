@@ -19,48 +19,73 @@
     return document.querySelector(DIALOG);
   }
 
-  // Cmd/Ctrl+K → toggle
+  function transition(update) {
+    if (document.startViewTransition) {
+      document.startViewTransition(update);
+    } else {
+      update();
+    }
+  }
+
+  function openSearch(d) {
+    if (!d || d.open) return;
+    transition(() => d.showModal());
+    requestAnimationFrame(() => {
+      const input = d.querySelector(INPUT);
+      if (input) {
+        input.focus();
+        input.select();
+      }
+    });
+  }
+
+  function closeSearch(d) {
+    if (!d || !d.open) return;
+    transition(() => d.close());
+  }
+
+  // Cmd/Ctrl+K toggle + Escape
   document.addEventListener("keydown", (e) => {
     if ((e.metaKey || e.ctrlKey) && !e.altKey && e.key.toLowerCase() === "k") {
       e.preventDefault();
       const d = dialog();
-      if (!d) return;
-      if (d.open) {
-        d.close();
-      } else {
-        d.showModal();
-        const input = d.querySelector(INPUT);
-        if (input) {
-          input.focus();
-          input.select();
-        }
+      if (d?.open) closeSearch(d);
+      else openSearch(d);
+      return;
+    }
+
+    if (e.key === "Escape") {
+      const d = dialog();
+      if (d?.open) {
+        e.preventDefault();
+        closeSearch(d);
       }
     }
   });
 
-  // Click trigger button → open
+  // Trigger button
   document.addEventListener("click", (e) => {
     if (e.target.closest("[data-search-open]")) {
       e.preventDefault();
-      const d = dialog();
-      if (d && !d.open) {
-        d.showModal();
-        const input = d.querySelector(INPUT);
-        if (input) {
-          input.focus();
-          input.select();
-        }
-      }
+      openSearch(dialog());
     }
   });
 
-  // Backdrop click → close (clicks on dialog itself, outside the modal div)
+  // Close button
   document.addEventListener("click", (e) => {
-    const d = dialog();
-    if (e.target === d) d.close();
+    if (e.target.closest("[data-search-close]")) {
+      e.preventDefault();
+      closeSearch(dialog());
+    }
   });
 
-  // Arrow keys + Enter inside open dialog
+  // Backdrop click
+  document.addEventListener("click", (e) => {
+    const d = dialog();
+    if (e.target === d) closeSearch(d);
+  });
+
+  // Arrow keys + Enter
   document.addEventListener("keydown", (e) => {
     const d = dialog();
     if (!d?.open) return;
@@ -92,7 +117,7 @@
     results[idx].scrollIntoView({ block: "nearest" });
   });
 
-  // Mouse hover → update active
+  // Mouse hover
   document.addEventListener("mouseenter", (e) => {
     const result = e.target.closest?.(RESULT);
     if (!result) return;
@@ -102,7 +127,7 @@
     result.classList.add("is-active");
   }, true);
 
-  // After HTMX swaps results, clear stale is-active (CSS :first-child takes over)
+  // HTMX swap: clear stale is-active
   document.addEventListener("htmx:afterSwap", (e) => {
     if (e.target.matches?.(RESULTS)) {
       e.target.querySelectorAll(`${RESULT}.is-active`).forEach((r) => {
@@ -112,7 +137,6 @@
     syncLabels();
   });
 
-  // Init
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", syncLabels, { once: true });
   } else {
