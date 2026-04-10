@@ -149,7 +149,11 @@ def _render_section_children(children: tuple[NavNode, ...], group: list[Componen
         if isinstance(child, NavDirectory):
             sub_icon = _ICON_FOLDER_OPEN if child.open else _ICON_FOLDER
             sub: list[ComponentType] = [
-                html.div(sub_icon, humanize_name(child.name), class_="nav-subsection"),
+                html.div(
+                    sub_icon,
+                    html.span(humanize_name(child.name), class_="nav-subsection-label"),
+                    class_="nav-subsection",
+                ),
             ]
             for f in _flatten_nav(child.children):
                 sub.append(_nav_link(f))
@@ -169,7 +173,7 @@ def render_nav_items(items: tuple[NavNode, ...]) -> ComponentType:
             continue
         icon = _ICON_FOLDER_OPEN if item.open else _ICON_FOLDER
         group: list[ComponentType] = [
-            html.div(icon, humanize_name(item.name), class_="nav-section"),
+            html.div(icon, html.span(humanize_name(item.name), class_="nav-section-label"), class_="nav-section"),
         ]
         _render_section_children(item.children, group)
         elements.append(html.div(*group, class_="nav-group"))
@@ -238,7 +242,7 @@ def _theme_buttons() -> tuple[ComponentType, ...]:
         html.button(
             SafeStr(icon),
             type="button",
-            class_="theme-btn",
+            class_="theme-btn hit-area-1",
             data_theme_btn=value,
             aria_label=f"{label} theme",
             title=label,
@@ -264,7 +268,7 @@ def _sidebar_toggle_btn() -> ComponentType:
         html.span(SafeStr(_ICON_SIDEBAR_CLOSE), class_="sidebar-icon-close"),
         html.span(SafeStr(_ICON_SIDEBAR_OPEN), class_="sidebar-icon-open"),
         type="button",
-        class_="sidebar-toggle",
+        class_="sidebar-toggle hit-area-2",
         data_sidebar_toggle="",
         aria_label="Toggle sidebar",
         title="Toggle sidebar",
@@ -285,31 +289,33 @@ def docs_shell(view: DocsPageView) -> ComponentType:
             title = html.span(view.config_name, class_="sidebar-title")
 
         toggle_btn = _sidebar_toggle_btn()
-        sidebar = html.aside(
-            html.div(title, class_="sidebar-header"),
-            html.div(
+        sidebar = Fragment(
+            html.aside(
+                html.div(title, class_="sidebar-header"),
                 html.div(
-                    html.span(view.root_dir, class_="sidebar-path-text"),
-                    html.button(
-                        SafeStr(_ICON_CLIPBOARD),
-                        SafeStr(_ICON_CLIPBOARD_CHECK),
-                        type="button",
-                        class_="copy-btn copy-btn-sm",
-                        data_copy_text=view.root_dir,
-                        aria_label="Copy path",
-                        title="Copy path",
+                    html.div(
+                        html.span(view.root_dir, class_="sidebar-path-text"),
+                        html.button(
+                            SafeStr(_ICON_CLIPBOARD),
+                            SafeStr(_ICON_CLIPBOARD_CHECK),
+                            type="button",
+                            class_="copy-btn copy-btn-sm hit-area-1",
+                            data_copy_text=view.root_dir,
+                            aria_label="Copy path",
+                            title="Copy path",
+                        ),
+                        class_="content-path-group",
                     ),
-                    class_="content-path-group",
+                    class_="sidebar-path",
                 ),
-                class_="sidebar-path",
+                render_nav_items(view.nav_items),
+                html.div(
+                    theme_picker(),
+                    class_="sidebar-footer",
+                ),
+                class_="sidebar",
             ),
-            render_nav_items(view.nav_items),
-            html.div(
-                theme_picker(),
-                class_="sidebar-footer",
-            ),
-            html.div(class_="sidebar-resize"),
-            class_="sidebar",
+            html.div(class_="sidebar-resize hit-area-x-2"),
         )
 
     shell_class = "app-shell with-sidebar" if view.with_sidebar else "app-shell"
@@ -326,7 +332,7 @@ def docs_shell(view: DocsPageView) -> ComponentType:
                         SafeStr(_ICON_CLIPBOARD),
                         SafeStr(_ICON_CLIPBOARD_CHECK),
                         type="button",
-                        class_="copy-btn",
+                        class_="copy-btn hit-area-1",
                         data_copy_text=view.rel_path,
                         aria_label="Copy file path",
                         title="Copy file path",

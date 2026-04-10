@@ -55,6 +55,9 @@ def test_directory_mode_redirects_to_readme_and_hides_gitignored_files(tmp_path:
         assert 'data-theme-btn="system"' in page_response.text
         assert 'data-theme-btn="light"' in page_response.text
         assert 'data-theme-btn="dark"' in page_response.text
+        assert "hit-area-1" in page_response.text
+        assert "hit-area-2" in page_response.text
+        assert "hit-area-x-2" in page_response.text
         assert "/public/vendor/htmx.min.js" in page_response.text
         assert 'hx-trigger="sse:reload"' in page_response.text
         assert "guide" in page_response.text

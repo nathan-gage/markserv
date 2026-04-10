@@ -4,6 +4,9 @@
   const MIN_WIDTH = 180;
   const MAX_WIDTH = 500;
   const DEFAULT_WIDTH = 260;
+  const ANIMATION_MS = 380;
+
+  let animationTimer = null;
 
   function storedWidth() {
     try {
@@ -38,6 +41,15 @@
     }
   }
 
+  function beginSidebarAnimation() {
+    document.documentElement.classList.add("sidebar-animating");
+    if (animationTimer) clearTimeout(animationTimer);
+    animationTimer = setTimeout(() => {
+      document.documentElement.classList.remove("sidebar-animating");
+      animationTimer = null;
+    }, ANIMATION_MS);
+  }
+
   // Apply immediately to avoid flash.
   applySidebarState();
 
@@ -48,6 +60,7 @@
   document.addEventListener("click", (e) => {
     if (!e.target.closest("[data-sidebar-toggle]")) return;
     const next = !storedCollapsed();
+    beginSidebarAnimation();
     try {
       localStorage.setItem(COLLAPSED_KEY, next ? "1" : "0");
     } catch {}
