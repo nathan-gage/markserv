@@ -135,7 +135,8 @@ def test_directory_mode_redirects_to_readme_and_hides_gitignored_files(tmp_path:
         assert "hit-area-2" in page_response.text
         assert "hit-area-x-2" in page_response.text
         assert "/public/vendor/htmx.min.js" in page_response.text
-        assert 'hx-trigger="sse:reload"' in page_response.text
+        assert 'data-live-fragment="/_live/docs/README.md"' in page_response.text
+        assert 'sse-connect="/_events"' not in page_response.text
         assert 'hx-get="/_live/docs/guide.md"' in page_response.text
         assert 'hx-push-url="true"' in page_response.text
         assert 'href="/docs/guide.md"' in page_response.text

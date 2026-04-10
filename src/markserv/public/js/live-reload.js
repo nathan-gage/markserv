@@ -1,61 +1,68 @@
 (() => {
-  let liveReloadSource = null;
+  let source = null;
+  let reloadRequest = null;
 
-  function trackSource(event) {
-    const elt = event.target;
-    if (!(elt instanceof Element)) return;
-    if (elt.getAttribute("sse-connect") !== "/_events") return;
+  function currentLiveFragmentHref() {
+    const shell = document.getElementById("page-shell");
+    if (!(shell instanceof HTMLElement)) return null;
 
-    const source = event.detail && event.detail.source;
-    if (!(source instanceof EventSource)) return;
+    const href = shell.dataset.liveFragment;
+    return href || null;
+  }
 
-    if (liveReloadSource && liveReloadSource !== source) {
-      liveReloadSource.close();
+  function closeSource() {
+    if (!source) return;
+    source.close();
+    source = null;
+  }
+
+  function syncSource() {
+    if (!currentLiveFragmentHref()) {
+      closeSource();
+      return;
     }
 
-    liveReloadSource = source;
-  }
+    if (source) return;
 
-  function clearTrackedSource(event) {
-    const source = event.detail && event.detail.source;
-    if (source && source === liveReloadSource) {
-      liveReloadSource = null;
-    }
-  }
-
-  function closeLiveReloadSource() {
-    if (!liveReloadSource) return;
-    liveReloadSource.close();
-    liveReloadSource = null;
-  }
-
-  function shouldCloseForClick(event) {
-    if (event.defaultPrevented) return false;
-    if (event.button !== 0) return false;
-    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return false;
-
-    const link = event.target.closest("a[href]");
-    if (!(link instanceof HTMLAnchorElement)) return false;
-    if (link.target && link.target !== "_self") return false;
-    if (link.hasAttribute("download")) return false;
-
-    const href = link.getAttribute("href");
-    if (!href || href.startsWith("#") || href.startsWith("javascript:")) return false;
-
-    return true;
-  }
-
-  document.addEventListener("htmx:sseOpen", trackSource);
-  document.addEventListener("htmx:sseClose", clearTrackedSource);
-  window.addEventListener("pagehide", closeLiveReloadSource);
-  window.addEventListener("beforeunload", closeLiveReloadSource);
-  document.addEventListener(
-    "click",
-    (event) => {
-      if (shouldCloseForClick(event)) {
-        closeLiveReloadSource();
+    source = new EventSource("/_events");
+    source.addEventListener("reload", requestReload);
+    source.addEventListener("error", () => {
+      if (source && source.readyState === EventSource.CLOSED) {
+        source = null;
       }
-    },
-    true,
-  );
+    });
+  }
+
+  function requestReload() {
+    const liveFragmentHref = currentLiveFragmentHref();
+    if (!liveFragmentHref || reloadRequest || !window.htmx) {
+      return;
+    }
+
+    reloadRequest = window.htmx.ajax("GET", liveFragmentHref, {
+      target: "#page-shell",
+      swap: "outerHTML",
+    });
+
+    if (reloadRequest && typeof reloadRequest.finally === "function") {
+      reloadRequest.finally(() => {
+        reloadRequest = null;
+        syncSource();
+      });
+      return;
+    }
+
+    reloadRequest = null;
+    syncSource();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", syncSource, { once: true });
+  } else {
+    syncSource();
+  }
+
+  document.addEventListener("htmx:afterSwap", syncSource);
+  window.addEventListener("pagehide", closeSource);
+  window.addEventListener("beforeunload", closeSource);
 })();

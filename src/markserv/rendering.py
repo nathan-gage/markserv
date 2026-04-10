@@ -98,23 +98,6 @@ def build_docs_view(
     )
 
 
-def sse_reload_listener(live_fragment_href: str | None) -> ComponentType:
-    if live_fragment_href is None:
-        return Fragment()
-
-    return html.div(
-        html.div(
-            hx_get=live_fragment_href,
-            hx_trigger="sse:reload",
-            hx_target="#page-shell",
-            hx_swap="outerHTML",
-        ),
-        hidden=True,
-        hx_ext="sse",
-        sse_connect="/_events",
-    )
-
-
 _ICON_FOLDER = SafeStr(
     '<svg class="nav-icon" width="14" height="14" viewBox="0 0 24 24" fill="none"'
     ' stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
@@ -347,7 +330,6 @@ def docs_shell(view: DocsPageView) -> ComponentType:
 
     shell_class = "app-shell with-sidebar" if view.with_sidebar else "app-shell"
     return html.div(
-        sse_reload_listener(view.live_fragment_href),
         toggle_btn,
         sidebar,
         theme_float,
@@ -377,12 +359,12 @@ def docs_shell(view: DocsPageView) -> ComponentType:
         id="page-shell",
         class_=shell_class,
         data_icon=icon_href(view.rel_path),
+        data_live_fragment=view.live_fragment_href,
     )
 
 
 def empty_shell(view: EmptyPageView) -> ComponentType:
     return html.main(
-        sse_reload_listener(view.live_fragment_href),
         floating_theme_picker(),
         html.div(
             html.h1("No markdown files found"),
@@ -405,6 +387,7 @@ def empty_shell(view: EmptyPageView) -> ComponentType:
         ),
         id="page-shell",
         class_="empty-state",
+        data_live_fragment=view.live_fragment_href,
     )
 
 
@@ -458,7 +441,6 @@ def base_document(
             html.body(
                 body_content,
                 html.script(src=public_asset_href("vendor/htmx.min.js")),
-                html.script(src=public_asset_href("vendor/sse.js")),
             ),
             lang="en",
             data_dev_reload="true" if dev_reload else None,
