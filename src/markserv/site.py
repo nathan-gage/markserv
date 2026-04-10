@@ -9,9 +9,89 @@ from urllib.parse import quote
 
 from ignoretree import IgnoreResolver
 
+from .markdown import MarkdownDocument, MarkdownFrontMatter, parse_markdown_document
+
 MARKDOWN_SUFFIXES = {".md", ".markdown", ".mdown", ".mkd", ".mkdn"}
 DEFAULT_IGNORE_PATTERNS = [".git/"]
 DIRECTORY_DEFAULT_BASENAMES = ("README", "readme", "index", "INDEX")
+SAFE_ASSET_EXTENSIONS = {
+    ".aac",
+    ".apng",
+    ".avif",
+    ".bmp",
+    ".bz2",
+    ".csv",
+    ".eot",
+    ".flac",
+    ".gif",
+    ".gz",
+    ".ico",
+    ".jpeg",
+    ".jpg",
+    ".json",
+    ".m4a",
+    ".m4v",
+    ".mov",
+    ".mp3",
+    ".mp4",
+    ".oga",
+    ".ogg",
+    ".ogv",
+    ".otf",
+    ".pdf",
+    ".png",
+    ".svg",
+    ".tar",
+    ".tgz",
+    ".tsv",
+    ".ttf",
+    ".txt",
+    ".wav",
+    ".weba",
+    ".webm",
+    ".webp",
+    ".woff",
+    ".woff2",
+    ".xml",
+    ".xz",
+    ".zip",
+}
+UNSAFE_ASSET_EXTENSIONS = {
+    ".bat",
+    ".cjs",
+    ".cmd",
+    ".com",
+    ".crt",
+    ".css",
+    ".der",
+    ".dll",
+    ".dylib",
+    ".exe",
+    ".htm",
+    ".html",
+    ".jar",
+    ".js",
+    ".key",
+    ".map",
+    ".mjs",
+    ".msi",
+    ".p12",
+    ".pem",
+    ".pfx",
+    ".ps1",
+    ".sh",
+    ".so",
+    ".war",
+    ".xhtml",
+}
+UNSAFE_ASSET_BASENAMES = {
+    "authorized_keys",
+    "id_dsa",
+    "id_ecdsa",
+    "id_ed25519",
+    "id_rsa",
+    "known_hosts",
+}
 
 
 class SitePathError(LookupError):
@@ -30,6 +110,9 @@ class ServeConfig:
 class MarkdownPage:
     rel_path: str
     label: str
+    title: str | None = None
+    nav_order: float | None = None
+    hidden: bool = False
 
 
 NavValue: TypeAlias = "NavTree | MarkdownPage"
@@ -116,29 +199,31 @@ class PageIndex:
 
     def choose_default_doc(self, preferred: str | None = None, prefix: str = "") -> str | None:
         normalized_prefix = prefix.strip("/")
-        if normalized_prefix:
-            base_prefix = f"{normalized_prefix}/"
-            candidates = [page.rel_path for page in self.pages if page.rel_path.startswith(base_prefix)]
-        else:
-            candidates = [page.rel_path for page in self.pages]
-
-        if not candidates:
+        candidate_pages = self._candidate_pages(normalized_prefix)
+        if not candidate_pages:
             return None
 
-        candidate_set = set(candidates)
+        candidate_set = {page.rel_path for page in candidate_pages}
         if preferred and preferred in candidate_set:
             return preferred
+
+        preferred_pages = [page for page in candidate_pages if not page.hidden] or candidate_pages
+        preferred_set = {page.rel_path for page in preferred_pages}
 
         for basename in DIRECTORY_DEFAULT_BASENAMES:
             for suffix in sorted(MARKDOWN_SUFFIXES):
                 candidate = f"{normalized_prefix}/{basename}{suffix}" if normalized_prefix else f"{basename}{suffix}"
-                if candidate in candidate_set:
+                if candidate in preferred_set:
                     return candidate
 
-        return sorted(candidates, key=lambda value: (value.count("/"), value.lower()))[0]
+        return sorted(
+            preferred_pages,
+            key=lambda page: (page.rel_path.count("/"), *_page_sort_key(page)),
+        )[0].rel_path
 
     def nav_items(self, current_rel: str) -> tuple[NavNode, ...]:
-        return _build_nav_nodes(_build_nav_tree(self.pages), current_rel)
+        visible_pages = tuple(page for page in self.pages if not page.hidden)
+        return _build_nav_nodes(_build_nav_tree(visible_pages), current_rel)
 
     def has_directory(self, rel_path: str) -> bool:
         normalized_path = rel_path.strip("/")
@@ -146,6 +231,19 @@ class PageIndex:
             return bool(self.pages)
         base_prefix = f"{normalized_path}/"
         return any(page.rel_path.startswith(base_prefix) for page in self.pages)
+
+    def page_for(self, rel_path: str) -> MarkdownPage | None:
+        for page in self.pages:
+            if page.rel_path == rel_path:
+                return page
+        return None
+
+    def _candidate_pages(self, normalized_prefix: str) -> tuple[MarkdownPage, ...]:
+        if not normalized_prefix:
+            return self.pages
+
+        base_prefix = f"{normalized_prefix}/"
+        return tuple(page for page in self.pages if page.rel_path.startswith(base_prefix))
 
 
 @dataclass(slots=True)
@@ -173,11 +271,13 @@ class FileSite:
         path = self._resolve_path(rel_path)
         if path is None or not path.exists() or not path.is_file() or not is_markdown_path(path):
             return None
-        return path.read_text(encoding="utf-8", errors="replace")
+        return self._read_document(path).body
 
     def resolve_asset(self, rel_path: str) -> Path | None:
         path = self._resolve_path(rel_path)
         if path is None or not path.exists() or not path.is_file() or is_markdown_path(path):
+            return None
+        if not is_safe_asset_path(rel_path):
             return None
         return path
 
@@ -204,6 +304,9 @@ class FileSite:
             return resolver.is_dir_ignored(rel_path, auto_enter=True)
         return resolver.is_ignored(rel_path, auto_enter=True)
 
+    def _read_document(self, path: Path) -> MarkdownDocument:
+        return parse_markdown_document(path.read_text(encoding="utf-8", errors="replace"))
+
 
 @dataclass(slots=True)
 class SyntheticSite:
@@ -214,24 +317,26 @@ class SyntheticSite:
     show_navigation: bool = True
     watch_root: Path | None = field(init=False, default=None)
     watch_filter: WatchPathFilter | None = field(init=False, default=None)
+    _documents: dict[str, MarkdownDocument] = field(init=False, repr=False)
     _page_index: PageIndex = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
-        normalized_documents: dict[str, str] = {}
+        normalized_documents: dict[str, MarkdownDocument] = {}
         for raw_path, markdown_text in self.documents.items():
             rel_path = normalize_rel_path(raw_path)
             if not rel_path or not is_markdown_path(Path(rel_path)):
                 raise ValueError(f"Synthetic document path must be markdown: {raw_path}")
-            normalized_documents[rel_path] = markdown_text
+            normalized_documents[rel_path] = parse_markdown_document(markdown_text)
 
-        self.documents = normalized_documents
+        self._documents = normalized_documents
+        self.documents = {rel_path: document.body for rel_path, document in normalized_documents.items()}
         if self.default_doc is not None:
             self.default_doc = normalize_rel_path(self.default_doc)
 
         self._page_index = PageIndex(
             tuple(
-                MarkdownPage(rel_path=rel_path, label=humanize_name(Path(rel_path).stem) + Path(rel_path).suffix)
-                for rel_path in sorted(self.documents, key=str.lower)
+                build_markdown_page(rel_path, Path(rel_path).stem, document.front_matter)
+                for rel_path, document in sorted(self._documents.items(), key=lambda item: item[0].lower())
             )
         )
 
@@ -239,7 +344,8 @@ class SyntheticSite:
         return self._page_index
 
     def read_markdown(self, rel_path: str) -> str | None:
-        return self.documents.get(rel_path)
+        document = self._documents.get(rel_path)
+        return None if document is None else document.body
 
     def resolve_asset(self, rel_path: str) -> Path | None:
         return None
@@ -311,9 +417,26 @@ def discover_pages(root_dir: Path) -> list[MarkdownPage]:
             path = current_dir / filename
             if not is_markdown_path(path):
                 continue
-            pages.append(MarkdownPage(rel_path=rel_path, label=humanize_name(path.stem)))
+            pages.append(
+                build_markdown_page(
+                    rel_path,
+                    path.stem,
+                    parse_markdown_document(path.read_text(encoding="utf-8", errors="replace")).front_matter,
+                )
+            )
 
     return pages
+
+
+def build_markdown_page(rel_path: str, fallback_stem: str, front_matter: MarkdownFrontMatter) -> MarkdownPage:
+    label = front_matter.nav_label or front_matter.title or humanize_name(fallback_stem)
+    return MarkdownPage(
+        rel_path=rel_path,
+        label=label,
+        title=front_matter.title,
+        nav_order=front_matter.nav_order,
+        hidden=front_matter.hidden,
+    )
 
 
 def humanize_name(stem: str) -> str:
@@ -323,6 +446,22 @@ def humanize_name(stem: str) -> str:
 
 def is_markdown_path(path: Path) -> bool:
     return path.suffix.lower() in MARKDOWN_SUFFIXES
+
+
+def is_safe_asset_path(rel_path: str) -> bool:
+    normalized_path = normalize_rel_path(rel_path)
+    parts = PurePosixPath(normalized_path).parts
+    if not parts or any(part.startswith(".") for part in parts):
+        return False
+
+    filename = parts[-1].lower()
+    if filename in UNSAFE_ASSET_BASENAMES or filename.startswith(".env"):
+        return False
+
+    suffixes = {suffix.lower() for suffix in Path(filename).suffixes}
+    if suffixes & UNSAFE_ASSET_EXTENSIONS:
+        return False
+    return bool(suffixes & SAFE_ASSET_EXTENSIONS)
 
 
 def normalize_rel_path(raw_path: str) -> str:
@@ -389,7 +528,7 @@ def _build_nav_nodes(tree: NavTree, current_rel: str, prefix: str = "") -> tuple
             )
         )
 
-    for page in sorted(files_only, key=lambda item: item.rel_path.lower()):
+    for page in sorted(files_only, key=_page_sort_key):
         items.append(
             NavFile(
                 label=page.label,
@@ -399,3 +538,12 @@ def _build_nav_nodes(tree: NavTree, current_rel: str, prefix: str = "") -> tuple
         )
 
     return tuple(items)
+
+
+def _page_sort_key(page: MarkdownPage) -> tuple[bool, float, str, str]:
+    return (
+        page.nav_order is None,
+        0.0 if page.nav_order is None else page.nav_order,
+        page.label.lower(),
+        page.rel_path.lower(),
+    )

@@ -14,6 +14,11 @@ def write_text(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
+def write_bytes(path: Path, content: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(content)
+
+
 def test_watch_filter_only_accepts_markdown_and_gitignore(tmp_path: Path) -> None:
     docs_root = tmp_path / "docs"
     write_text(docs_root / ".gitignore", ".venv/\n")
@@ -72,8 +77,12 @@ def test_directory_mode_redirects_to_readme_and_hides_gitignored_files(tmp_path:
         assert "/public/css/app.css" in page_response.text
         assert "/public/css/github-markdown-light.css" in page_response.text
         assert "/public/css/github-markdown-dark.css" in page_response.text
+        assert "/public/css/pygments-light.css" in page_response.text
+        assert "/public/css/pygments-dark.css" in page_response.text
         assert 'id="github-markdown-light"' in page_response.text
         assert 'id="github-markdown-dark"' in page_response.text
+        assert 'id="pygments-light"' in page_response.text
+        assert 'id="pygments-dark"' in page_response.text
         assert "/public/js/theme.js" in page_response.text
         assert 'data-theme-btn="system"' in page_response.text
         assert 'data-theme-btn="light"' in page_response.text
@@ -93,6 +102,7 @@ def test_directory_mode_redirects_to_readme_and_hides_gitignored_files(tmp_path:
         asset_response = client.get("/public/css/app.css")
         assert asset_response.status_code == 200
         assert asset_response.headers["content-type"].startswith("text/css")
+        assert asset_response.headers["x-content-type-options"] == "nosniff"
 
         theme_asset_response = client.get("/public/js/theme.js")
         assert theme_asset_response.status_code == 200
@@ -101,3 +111,73 @@ def test_directory_mode_redirects_to_readme_and_hides_gitignored_files(tmp_path:
 
         ignored_response = client.get("/docs/.venv/ignored.md")
         assert ignored_response.status_code == 404
+
+
+def test_front_matter_controls_title_navigation_and_hidden_pages(tmp_path: Path) -> None:
+    docs_root = tmp_path / "docs"
+    write_text(
+        docs_root / "README.md",
+        "---\ntitle: Overview\nnav_label: Project Home\nnav_order: 20\n---\n# Internal heading\n",
+    )
+    write_text(
+        docs_root / "guide.md",
+        "---\nnav_label: First Steps\nnav_order: 5\n---\n# Guide\n",
+    )
+    write_text(
+        docs_root / "secret.md",
+        "---\nnav_label: Secret Notes\nhidden: true\n---\n# Secret\n",
+    )
+
+    config = build_config(docs_root)
+
+    with TestClient(create_app(config)) as client:
+        response = client.get("/docs/README.md")
+        assert response.status_code == 200
+        assert "Overview · markserv" in response.text
+        assert ">Project Home<" in response.text
+        assert ">First Steps<" in response.text
+        assert response.text.index(">First Steps<") < response.text.index(">Project Home<")
+        assert "Secret Notes" not in response.text
+        assert "title: Overview" not in response.text
+        assert "nav_label: Project Home" not in response.text
+
+        hidden_page_response = client.get("/docs/secret.md")
+        assert hidden_page_response.status_code == 200
+        assert "Secret · markserv" in hidden_page_response.text
+        assert "Secret Notes" not in hidden_page_response.text
+
+
+def test_asset_serving_allows_safe_files_and_blocks_sensitive_or_active_content(tmp_path: Path) -> None:
+    docs_root = tmp_path / "docs"
+    write_text(docs_root / "README.md", "# Home\n")
+    write_bytes(docs_root / "diagram.png", b"not-a-real-png")
+    write_text(docs_root / "notes.txt", "hello\n")
+    write_text(docs_root / "logo.svg", '<svg xmlns="http://www.w3.org/2000/svg"></svg>')
+    write_text(docs_root / ".env", "TOKEN=secret\n")
+    write_text(docs_root / "script.js", "alert('x')\n")
+    write_text(docs_root / "page.html", "<script>alert(1)</script>\n")
+    write_text(docs_root / "deploy.pem", "pem-data\n")
+
+    config = build_config(docs_root)
+
+    with TestClient(create_app(config)) as client:
+        image_response = client.get("/docs/diagram.png")
+        assert image_response.status_code == 200
+        assert image_response.headers["content-type"].startswith("image/png")
+        assert image_response.headers["x-content-type-options"] == "nosniff"
+
+        text_response = client.get("/docs/notes.txt")
+        assert text_response.status_code == 200
+        assert text_response.headers["content-type"].startswith("text/plain")
+        assert text_response.headers["x-content-type-options"] == "nosniff"
+
+        svg_response = client.get("/docs/logo.svg")
+        assert svg_response.status_code == 200
+        assert svg_response.headers["content-security-policy"] == (
+            "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; sandbox"
+        )
+
+        assert client.get("/docs/.env").status_code == 404
+        assert client.get("/docs/script.js").status_code == 404
+        assert client.get("/docs/page.html").status_code == 404
+        assert client.get("/docs/deploy.pem").status_code == 404

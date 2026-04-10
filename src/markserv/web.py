@@ -35,6 +35,8 @@ from .site import (
 )
 
 NO_CACHE_HEADERS = {"Cache-Control": "no-store"}
+NO_SNIFF_HEADERS = {**NO_CACHE_HEADERS, "X-Content-Type-Options": "nosniff"}
+SVG_CONTENT_SECURITY_POLICY = "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; sandbox"
 PACKAGE_DIR = Path(__file__).resolve().parent
 PUBLIC_DIR = PACKAGE_DIR / "public"
 PYTHON_RELOAD_ENV_VAR = "MARKSERV_PYTHON_RELOAD"
@@ -91,10 +93,25 @@ def public_asset_response(asset_path: str) -> Response:
         raise HTTPException(status_code=404, detail="Asset not found")
 
     media_type, _encoding = mimetypes.guess_type(target.name)
+    headers = dict(NO_SNIFF_HEADERS)
+    if target.suffix.lower() == ".svg":
+        headers["Content-Security-Policy"] = SVG_CONTENT_SECURITY_POLICY
     return Response(
         target.read_bytes(),
         media_type=media_type or "application/octet-stream",
-        headers=NO_CACHE_HEADERS,
+        headers=headers,
+    )
+
+
+def asset_file_response(asset_path: Path) -> Response:
+    media_type, _encoding = mimetypes.guess_type(asset_path.name)
+    headers = dict(NO_SNIFF_HEADERS)
+    if asset_path.suffix.lower() == ".svg":
+        headers["Content-Security-Policy"] = SVG_CONTENT_SECURITY_POLICY
+    return FileResponse(
+        asset_path,
+        media_type=media_type or "application/octet-stream",
+        headers=headers,
     )
 
 
@@ -126,7 +143,7 @@ def resolve_docs_response(
 
     asset_path = site.resolve_asset(rel_path)
     if asset_path is not None:
-        return FileResponse(asset_path, headers=NO_CACHE_HEADERS)
+        return asset_file_response(asset_path)
 
     if htmx:
         fallback = page_index.choose_default_doc(preferred=site.default_doc)

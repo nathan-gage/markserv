@@ -76,6 +76,10 @@ body {
   min-height: 100vh;
 }
 
+.markdown-body :is(h1, h2, h3, h4, h5, h6) {
+  scroll-margin-top: 1rem;
+}
+
 .hit-area,
 .hit-area-1,
 .hit-area-2,

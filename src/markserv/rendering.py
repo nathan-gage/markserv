@@ -4,13 +4,11 @@ import re
 from dataclasses import dataclass
 from urllib.parse import quote
 
-import cmarkgfm
-from cmarkgfm.cmark import Options
 from htmy import Component, ComponentType, Fragment, SafeStr, html
 
+from .markdown import render_markdown
 from .site import NavDirectory, NavFile, NavNode, PageIndex, SiteSource, humanize_name
 
-CMARK_OPTIONS = Options.CMARK_OPT_GITHUB_PRE_LANG | Options.CMARK_OPT_SMART
 TITLE_RE = re.compile(r"^\s{0,3}#\s+(.+?)\s*$", re.MULTILINE)
 
 
@@ -43,10 +41,6 @@ def extract_title(markdown_text: str, fallback: str) -> str:
     return title or fallback
 
 
-def render_markdown(markdown_text: str) -> str:
-    return cmarkgfm.github_flavored_markdown_to_html(markdown_text, options=CMARK_OPTIONS)
-
-
 def docs_href(rel_path: str) -> str:
     return f"/docs/{quote(rel_path, safe='/')}"
 
@@ -75,9 +69,16 @@ def build_empty_view(site: SiteSource, *, dev_reload: bool = False) -> EmptyPage
 def build_docs_view(
     site: SiteSource, page_index: PageIndex, rel_path: str, markdown_text: str, *, dev_reload: bool = False
 ) -> DocsPageView:
-    title = extract_title(markdown_text, fallback=humanize_name(rel_path.rsplit("/", 1)[-1].rsplit(".", 1)[0]))
+    page = page_index.page_for(rel_path)
+    fallback_title = humanize_name(rel_path.rsplit("/", 1)[-1].rsplit(".", 1)[0])
+    title = (
+        page.title
+        if page is not None and page.title is not None
+        else extract_title(markdown_text, fallback=fallback_title)
+    )
     home_doc = page_index.choose_default_doc(preferred=site.default_doc)
-    with_sidebar = site.show_navigation and bool(page_index.pages)
+    nav_items = page_index.nav_items(rel_path)
+    with_sidebar = site.show_navigation and bool(nav_items)
 
     live_fragment_href = None
     if site.watch_root is not None and site.watch_filter is not None:
@@ -91,7 +92,7 @@ def build_docs_view(
         config_name=site.name,
         root_dir=site.root_label,
         home_href=None if home_doc is None else docs_href(home_doc),
-        nav_items=page_index.nav_items(rel_path),
+        nav_items=nav_items,
         live_fragment_href=live_fragment_href,
         dev_reload=dev_reload,
     )
@@ -412,6 +413,18 @@ def base_document(
                     href=public_asset_href("css/github-markdown-dark.css"),
                     media="(prefers-color-scheme: dark)",
                     id="github-markdown-dark",
+                ),
+                html.link(
+                    rel="stylesheet",
+                    href=public_asset_href("css/pygments-light.css"),
+                    media="(prefers-color-scheme: light), (prefers-color-scheme: no-preference)",
+                    id="pygments-light",
+                ),
+                html.link(
+                    rel="stylesheet",
+                    href=public_asset_href("css/pygments-dark.css"),
+                    media="(prefers-color-scheme: dark)",
+                    id="pygments-dark",
                 ),
                 html.link(rel="stylesheet", href=public_asset_href("css/app.css")),
                 html.script(src=public_asset_href("js/theme.js")),

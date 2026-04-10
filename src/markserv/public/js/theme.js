@@ -32,16 +32,23 @@
     return preference === SYSTEM_THEME ? systemTheme() : preference;
   }
 
+  const THEME_STYLESHEET_PAIRS = [
+    ["github-markdown-light", "github-markdown-dark"],
+    ["pygments-light", "pygments-dark"],
+  ];
+
   function setStylesheetMedia(theme) {
-    const lightStylesheet = document.getElementById("github-markdown-light");
-    const darkStylesheet = document.getElementById("github-markdown-dark");
+    THEME_STYLESHEET_PAIRS.forEach(([lightId, darkId]) => {
+      const lightStylesheet = document.getElementById(lightId);
+      const darkStylesheet = document.getElementById(darkId);
 
-    if (!(lightStylesheet instanceof HTMLLinkElement) || !(darkStylesheet instanceof HTMLLinkElement)) {
-      return;
-    }
+      if (!(lightStylesheet instanceof HTMLLinkElement) || !(darkStylesheet instanceof HTMLLinkElement)) {
+        return;
+      }
 
-    lightStylesheet.media = theme === LIGHT_THEME ? "all" : "not all";
-    darkStylesheet.media = theme === DARK_THEME ? "all" : "not all";
+      lightStylesheet.media = theme === LIGHT_THEME ? "all" : "not all";
+      darkStylesheet.media = theme === DARK_THEME ? "all" : "not all";
+    });
   }
 
   const THEME_LABELS = { system: "System", light: "Light", dark: "Dark" };
