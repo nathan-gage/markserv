@@ -6,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from markserv.app import WatchPathFilter, build_config, create_app
+from markserv.web import is_dev_reload_asset
 
 
 def write_text(path: Path, content: str) -> None:
@@ -28,6 +29,13 @@ def test_watch_filter_only_accepts_markdown_and_gitignore(tmp_path: Path) -> Non
     assert path_filter(None, str(docs_root / ".gitignore")) is True
     assert path_filter(None, str(docs_root / "app.py")) is False
     assert path_filter(None, str(docs_root / ".venv" / "ignored.md")) is False
+
+
+def test_dev_reload_asset_filter_matches_css_and_js_only() -> None:
+    assert is_dev_reload_asset("src/markserv/public/css/app.css") is True
+    assert is_dev_reload_asset("src/markserv/public/js/theme.js") is True
+    assert is_dev_reload_asset("src/markserv/public/licenses/htmx.LICENSE") is False
+    assert is_dev_reload_asset("src/markserv/rendering.py") is False
 
 
 def test_python_reload_mode_includes_dev_reload_client(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

@@ -38,6 +38,7 @@ NO_CACHE_HEADERS = {"Cache-Control": "no-store"}
 PACKAGE_DIR = Path(__file__).resolve().parent
 PUBLIC_DIR = PACKAGE_DIR / "public"
 PYTHON_RELOAD_ENV_VAR = "MARKSERV_PYTHON_RELOAD"
+DEV_RELOAD_ASSET_EXTENSIONS = {".css", ".js"}
 
 
 class ReloadBroker:
@@ -139,6 +140,10 @@ def python_reload_enabled() -> bool:
     return value.lower() in {"1", "true", "yes", "on"}
 
 
+def is_dev_reload_asset(path: str) -> bool:
+    return Path(path).suffix.lower() in DEV_RELOAD_ASSET_EXTENSIONS
+
+
 async def watch_for_changes(root_dir: Path, path_filter: WatchPathFilter, broker: ReloadBroker) -> None:
     async for changes in awatch(
         root_dir,
@@ -152,25 +157,46 @@ async def watch_for_changes(root_dir: Path, path_filter: WatchPathFilter, broker
         await broker.publish()
 
 
+async def watch_for_dev_reload_assets(public_dir: Path, broker: ReloadBroker) -> None:
+    async for _changes in awatch(
+        public_dir,
+        watch_filter=lambda _change, path: is_dev_reload_asset(path),
+        debounce=150,
+        step=50,
+        ignore_permission_denied=True,
+    ):
+        await broker.publish()
+
+
 def create_app(config_or_site: ServeConfig | SiteSource) -> FastAPI:
     site: SiteSource = build_file_site(config_or_site) if isinstance(config_or_site, ServeConfig) else config_or_site
     broker = ReloadBroker()
+    dev_reload_broker = ReloadBroker()
     dev_reload = python_reload_enabled()
     htmy = HTMY(stream=False)
 
     @contextlib.asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
-        if site.watch_root is None or site.watch_filter is None:
+        tasks: list[asyncio.Task[None]] = []
+
+        if site.watch_root is not None and site.watch_filter is not None:
+            tasks.append(asyncio.create_task(watch_for_changes(site.watch_root, site.watch_filter, broker)))
+
+        if dev_reload:
+            tasks.append(asyncio.create_task(watch_for_dev_reload_assets(PUBLIC_DIR, dev_reload_broker)))
+
+        if not tasks:
             yield
             return
 
-        task = asyncio.create_task(watch_for_changes(site.watch_root, site.watch_filter, broker))
         try:
             yield
         finally:
-            task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await task
+            for task in tasks:
+                task.cancel()
+            for task in tasks:
+                with contextlib.suppress(asyncio.CancelledError):
+                    await task
 
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
 
@@ -226,10 +252,14 @@ def create_app(config_or_site: ServeConfig | SiteSource) -> FastAPI:
         @app.get("/_dev/reload")
         async def dev_reload_events() -> StreamingResponse:
             async def event_stream() -> AsyncIterator[str]:
+                version = dev_reload_broker.version
                 yield "retry: 250\n\n"
                 while True:
-                    await asyncio.sleep(15)
-                    yield "event: ping\ndata: keepalive\n\n"
+                    version, changed = await dev_reload_broker.wait_for_update(version)
+                    if changed:
+                        yield "event: reload\ndata: now\n\n"
+                    else:
+                        yield "event: ping\ndata: keepalive\n\n"
 
             return StreamingResponse(
                 event_stream(),

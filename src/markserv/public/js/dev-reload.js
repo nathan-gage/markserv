@@ -18,6 +18,10 @@
     sawDisconnect = false;
   });
 
+  source.addEventListener("reload", () => {
+    window.location.reload();
+  });
+
   source.addEventListener("error", () => {
     if (connectedOnce) {
       sawDisconnect = true;
