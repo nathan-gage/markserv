@@ -1,6 +1,6 @@
 [project]
 name = "markserv"
-version = "0.1.0"
+version = "1.0.0"
 description = "Live-render GitHub-flavored markdown files and folders"
 readme = "README.md"
 authors = [{ name = "Nathan Gage", email = "nathan@sweetspot.so" }]
