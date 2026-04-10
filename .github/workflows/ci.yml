@@ -14,14 +14,43 @@ env:
 
 permissions:
   contents: read
+  pull-requests: read
 
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: changes / python
+    runs-on: ubuntu-latest
+    outputs:
+      python: ${{ steps.filter.outputs.python }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Detect Python-related changes
+        id: filter
+        uses: dorny/paths-filter@v4.0.1
+        with:
+          filters: |
+            python:
+              - '.github/workflows/ci.yml'
+              - '.python-version'
+              - 'Makefile'
+              - '**/*.py'
+              - 'pyproject.toml'
+              - 'uv.lock'
+
   checks:
     name: checks / ubuntu / py3.14
+    needs: changes
+    if: ${{ needs.changes.outputs.python == 'true' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -53,6 +82,8 @@ jobs:
 
   tests:
     name: tests / ubuntu / py${{ matrix.python-version }}
+    needs: changes
+    if: ${{ needs.changes.outputs.python == 'true' }}
     runs-on: ubuntu-latest
 
     strategy:
@@ -89,15 +120,27 @@ jobs:
     name: required
     if: ${{ always() }}
     needs:
+      - changes
       - checks
       - tests
     runs-on: ubuntu-latest
 
     steps:
-      - name: Verify all required jobs passed
+      - name: Verify CI result
         run: |-
+          echo "changes: ${{ needs.changes.result }}"
+          echo "python changes: ${{ needs.changes.outputs.python }}"
           echo "checks: ${{ needs.checks.result }}"
           echo "tests: ${{ needs.tests.result }}"
+
+          if [ "${{ needs.changes.result }}" != "success" ]; then
+            exit 1
+          fi
+
+          if [ "${{ needs.changes.outputs.python }}" != "true" ]; then
+            echo "No Python-related changes detected; skipping checks and tests."
+            exit 0
+          fi
 
           if [ "${{ needs.checks.result }}" != "success" ] || [ "${{ needs.tests.result }}" != "success" ]; then
             exit 1
