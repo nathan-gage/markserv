@@ -24,7 +24,7 @@ jobs:
       - name: Validate PR title and release label
         uses: actions/github-script@v7
         with:
-          script: |
+          script: |-
             const pr = context.payload.pull_request
 
             if (pr.draft) {

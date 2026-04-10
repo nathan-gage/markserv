@@ -17,7 +17,7 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["httpx>=0.28.1", "pytest>=8.4.0"]
+dev = ["httpx>=0.28.1", "pytest>=8.4.0", "yamlfix>=1.19.1"]
 lint = ["mypy>=1.15.0", "pyright>=1.1.408", "ruff>=0.14.0", "taplo>=0.9.3"]
 
 [project.scripts]
@@ -82,6 +82,14 @@ filterwarnings = [
   "error",
   'ignore:.*asyncio\.iscoroutinefunction.*:DeprecationWarning:fasthx\.utils',
 ]
+
+[tool.yamlfix]
+explicit_start = false
+preserve_quotes = true
+sequence_style = "keep_style"
+line_length = 120
+section_whitelines = 1
+whitelines = 1
 
 [build-system]
 requires = ["uv_build>=0.11.2,<0.12.0"]
