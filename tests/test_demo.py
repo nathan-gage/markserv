@@ -14,9 +14,11 @@ def test_demo_site_contains_nested_markdown() -> None:
 
     assert "README.md" in markdown_files
     assert "guides/quickstart.md" in markdown_files
+    assert "guides/features/front-matter.md" in markdown_files
     assert "guides/features/gfm.md" in markdown_files
     assert "guides/nested/deep-dive.md" in markdown_files
     assert "reference/notes.md" in markdown_files
+    assert "reference/hidden-page.md" in markdown_files
 
 
 def test_demo_site_renders_without_filesystem_fixture() -> None:
@@ -25,12 +27,43 @@ def test_demo_site_renders_without_filesystem_fixture() -> None:
         assert root_response.status_code == 307
         assert root_response.headers["location"] == "/docs/README.md"
 
-        page_response = client.get("/docs/guides/features/gfm.md")
+        home_response = client.get("/docs/README.md")
+        assert home_response.status_code == 200
+        assert "Demo Home · markserv" in home_response.text
+        assert ">Welcome<" in home_response.text
+        assert ">Start Here<" in home_response.text
+        assert ">Hidden page<" not in home_response.text
+
+        page_response = client.get("/docs/guides/features/front-matter.md")
         assert page_response.status_code == 200
-        assert "GitHub-flavored markdown examples · markserv" in page_response.text
+        assert "YAML front matter · markserv" in page_response.text
+        assert "sidebar label" in page_response.text
         assert 'data-theme-btn="system"' in page_response.text
         assert 'hx-trigger="sse:reload"' not in page_response.text
         assert 'sse-connect="/_events"' not in page_response.text
+
+        hidden_page_response = client.get("/docs/reference/hidden-page.md")
+        assert hidden_page_response.status_code == 200
+        assert "Hidden page · markserv" in hidden_page_response.text
+        assert 'class="nav-link is-active">Hidden page<' not in hidden_page_response.text
+
+
+def test_demo_front_matter_controls_labels_and_ordering() -> None:
+    site = demo.build_demo_site()
+    page_index = site.page_index()
+
+    home_page = page_index.page_for("README.md")
+    quickstart_page = page_index.page_for("guides/quickstart.md")
+    hidden_page = page_index.page_for("reference/hidden-page.md")
+
+    assert home_page is not None and home_page.label == "Welcome"
+    assert quickstart_page is not None and quickstart_page.label == "Start Here"
+    assert hidden_page is not None and hidden_page.hidden is True
+
+    with TestClient(create_app(site)) as client:
+        response = client.get("/docs/guides/features/front-matter.md")
+        assert response.status_code == 200
+        assert response.text.index(">Front matter<") < response.text.index(">GFM examples<")
 
 
 def test_demo_uses_uvicorn_reload_when_env_var_set(monkeypatch: pytest.MonkeyPatch) -> None:
