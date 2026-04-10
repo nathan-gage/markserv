@@ -1,6 +1,6 @@
 [project]
 name = "markserv"
-version = "1.1.0"
+version = "1.1.1"
 description = "Preview local Markdown files and doc trees with live reload, sidebar navigation, anchors, and syntax highlighting"
 readme = { file = "README.md", content-type = "text/markdown" }
 authors = [{ name = "Nathan Gage", email = "nathan@sweetspot.so" }]
