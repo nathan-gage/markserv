@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import mimetypes
+import os
 from collections.abc import AsyncIterator
 from pathlib import Path
 
@@ -36,6 +37,7 @@ from .site import (
 NO_CACHE_HEADERS = {"Cache-Control": "no-store"}
 PACKAGE_DIR = Path(__file__).resolve().parent
 PUBLIC_DIR = PACKAGE_DIR / "public"
+PYTHON_RELOAD_ENV_VAR = "MARKSERV_PYTHON_RELOAD"
 
 
 class ReloadBroker:
@@ -101,7 +103,9 @@ def redirect_response(location: str, *, htmx: bool = False) -> Response:
     return RedirectResponse(location, status_code=307, headers=NO_CACHE_HEADERS)
 
 
-def resolve_docs_response(site: SiteSource, requested_path: str, *, htmx: bool = False) -> Response | DocsPageView:
+def resolve_docs_response(
+    site: SiteSource, requested_path: str, *, htmx: bool = False, dev_reload: bool = False
+) -> Response | DocsPageView:
     try:
         rel_path = normalize_rel_path(requested_path)
     except SitePathError as exc:
@@ -117,7 +121,7 @@ def resolve_docs_response(site: SiteSource, requested_path: str, *, htmx: bool =
 
     markdown_text = site.read_markdown(rel_path)
     if markdown_text is not None:
-        return build_docs_view(site, page_index, rel_path, markdown_text)
+        return build_docs_view(site, page_index, rel_path, markdown_text, dev_reload=dev_reload)
 
     asset_path = site.resolve_asset(rel_path)
     if asset_path is not None:
@@ -128,6 +132,11 @@ def resolve_docs_response(site: SiteSource, requested_path: str, *, htmx: bool =
         return redirect_response(docs_href(fallback) if fallback is not None else "/", htmx=True)
 
     raise HTTPException(status_code=404, detail="Not found")
+
+
+def python_reload_enabled() -> bool:
+    value = os.environ.get(PYTHON_RELOAD_ENV_VAR, "")
+    return value.lower() in {"1", "true", "yes", "on"}
 
 
 async def watch_for_changes(root_dir: Path, path_filter: WatchPathFilter, broker: ReloadBroker) -> None:
@@ -146,6 +155,7 @@ async def watch_for_changes(root_dir: Path, path_filter: WatchPathFilter, broker
 def create_app(config_or_site: ServeConfig | SiteSource) -> FastAPI:
     site: SiteSource = build_file_site(config_or_site) if isinstance(config_or_site, ServeConfig) else config_or_site
     broker = ReloadBroker()
+    dev_reload = python_reload_enabled()
     htmy = HTMY(stream=False)
 
     @contextlib.asynccontextmanager
@@ -211,6 +221,26 @@ def create_app(config_or_site: ServeConfig | SiteSource) -> FastAPI:
             },
         )
 
+    if dev_reload:
+
+        @app.get("/_dev/reload")
+        async def dev_reload_events() -> StreamingResponse:
+            async def event_stream() -> AsyncIterator[str]:
+                yield "retry: 250\n\n"
+                while True:
+                    await asyncio.sleep(15)
+                    yield "event: ping\ndata: keepalive\n\n"
+
+            return StreamingResponse(
+                event_stream(),
+                media_type="text/event-stream",
+                headers={
+                    "Cache-Control": "no-cache",
+                    "Connection": "keep-alive",
+                    "X-Accel-Buffering": "no",
+                },
+            )
+
     @app.get("/", response_model=None)
     @app.get("/docs", response_model=None)
     @htmy.page(render_empty_page)
@@ -223,7 +253,7 @@ def create_app(config_or_site: ServeConfig | SiteSource) -> FastAPI:
         if home_doc is not None:
             return redirect_response(docs_href(home_doc))
 
-        return build_empty_view(site)
+        return build_empty_view(site, dev_reload=dev_reload)
 
     @app.get("/_live/root", response_model=None)
     @htmy.hx(render_empty_fragment, no_data=True)
@@ -236,18 +266,18 @@ def create_app(config_or_site: ServeConfig | SiteSource) -> FastAPI:
         if home_doc is not None:
             return redirect_response(docs_href(home_doc), htmx=True)
 
-        return build_empty_view(site)
+        return build_empty_view(site, dev_reload=dev_reload)
 
     @app.get("/docs/{requested_path:path}", response_model=None)
     @htmy.page(render_docs_page)
     async def docs(requested_path: str, response: FastAPIResponse) -> Response | DocsPageView:
         response.headers.update(NO_CACHE_HEADERS)
-        return resolve_docs_response(site, requested_path)
+        return resolve_docs_response(site, requested_path, dev_reload=dev_reload)
 
     @app.get("/_live/docs/{requested_path:path}", response_model=None)
     @htmy.hx(render_docs_fragment, no_data=True)
     async def docs_fragment(requested_path: str, response: FastAPIResponse) -> Response | DocsPageView:
         response.headers.update(NO_CACHE_HEADERS)
-        return resolve_docs_response(site, requested_path, htmx=True)
+        return resolve_docs_response(site, requested_path, htmx=True, dev_reload=dev_reload)
 
     return app

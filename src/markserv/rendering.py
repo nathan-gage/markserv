@@ -25,12 +25,14 @@ class DocsPageView:
     home_href: str | None
     nav_items: tuple[NavNode, ...]
     live_fragment_href: str | None
+    dev_reload: bool = False
 
 
 @dataclass(frozen=True)
 class EmptyPageView:
     root_dir: str
     live_fragment_href: str | None
+    dev_reload: bool = False
 
 
 def extract_title(markdown_text: str, fallback: str) -> str:
@@ -65,12 +67,14 @@ def root_fragment_href() -> str:
     return "/_live/root"
 
 
-def build_empty_view(site: SiteSource) -> EmptyPageView:
+def build_empty_view(site: SiteSource, *, dev_reload: bool = False) -> EmptyPageView:
     live_fragment_href = root_fragment_href() if site.watch_root is not None and site.watch_filter is not None else None
-    return EmptyPageView(root_dir=site.root_label, live_fragment_href=live_fragment_href)
+    return EmptyPageView(root_dir=site.root_label, live_fragment_href=live_fragment_href, dev_reload=dev_reload)
 
 
-def build_docs_view(site: SiteSource, page_index: PageIndex, rel_path: str, markdown_text: str) -> DocsPageView:
+def build_docs_view(
+    site: SiteSource, page_index: PageIndex, rel_path: str, markdown_text: str, *, dev_reload: bool = False
+) -> DocsPageView:
     title = extract_title(markdown_text, fallback=humanize_name(rel_path.rsplit("/", 1)[-1].rsplit(".", 1)[0]))
     home_doc = page_index.choose_default_doc(preferred=site.default_doc)
     with_sidebar = site.show_navigation and bool(page_index.pages)
@@ -89,6 +93,7 @@ def build_docs_view(site: SiteSource, page_index: PageIndex, rel_path: str, mark
         home_href=None if home_doc is None else docs_href(home_doc),
         nav_items=page_index.nav_items(rel_path),
         live_fragment_href=live_fragment_href,
+        dev_reload=dev_reload,
     )
 
 
@@ -381,7 +386,9 @@ def empty_shell(view: EmptyPageView) -> ComponentType:
     )
 
 
-def base_document(title: str, body_content: ComponentType, favicon_href: str | None = None) -> Component:
+def base_document(
+    title: str, body_content: ComponentType, favicon_href: str | None = None, *, dev_reload: bool = False
+) -> Component:
     favicon: ComponentType = Fragment()
     if favicon_href is not None:
         favicon = html.link(rel="icon", type="image/png", href=favicon_href, id="favicon")
@@ -411,6 +418,7 @@ def base_document(title: str, body_content: ComponentType, favicon_href: str | N
                 html.script(src=public_asset_href("js/sidebar.js")),
                 html.script(src=public_asset_href("js/clipboard.js")),
                 html.script(src=public_asset_href("js/favicon.js"), defer=True),
+                html.script(src=public_asset_href("js/dev-reload.js"), defer=True) if dev_reload else Fragment(),
             ),
             html.body(
                 body_content,
@@ -418,16 +426,22 @@ def base_document(title: str, body_content: ComponentType, favicon_href: str | N
                 html.script(src=public_asset_href("vendor/sse.js")),
             ),
             lang="en",
+            data_dev_reload="true" if dev_reload else None,
         ),
     )
 
 
 def render_docs_page(view: DocsPageView) -> Component:
-    return base_document(f"{view.title} · markserv", docs_shell(view), favicon_href=icon_href(view.rel_path))
+    return base_document(
+        f"{view.title} · markserv",
+        docs_shell(view),
+        favicon_href=icon_href(view.rel_path),
+        dev_reload=view.dev_reload,
+    )
 
 
 def render_empty_page(view: EmptyPageView) -> Component:
-    return base_document("markserv", empty_shell(view))
+    return base_document("markserv", empty_shell(view), dev_reload=view.dev_reload)
 
 
 def render_docs_fragment(view: DocsPageView) -> ComponentType:

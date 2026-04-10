@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from markserv.app import WatchPathFilter, build_config, create_app
@@ -27,6 +28,20 @@ def test_watch_filter_only_accepts_markdown_and_gitignore(tmp_path: Path) -> Non
     assert path_filter(None, str(docs_root / ".gitignore")) is True
     assert path_filter(None, str(docs_root / "app.py")) is False
     assert path_filter(None, str(docs_root / ".venv" / "ignored.md")) is False
+
+
+def test_python_reload_mode_includes_dev_reload_client(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    docs_root = tmp_path / "docs"
+    write_text(docs_root / "README.md", "# Home\n")
+
+    config = build_config(docs_root)
+    monkeypatch.setenv("MARKSERV_PYTHON_RELOAD", "1")
+
+    with TestClient(create_app(config)) as client:
+        page_response = client.get("/docs/README.md")
+        assert page_response.status_code == 200
+        assert "/public/js/dev-reload.js" in page_response.text
+        assert 'data-dev-reload="true"' in page_response.text
 
 
 def test_directory_mode_redirects_to_readme_and_hides_gitignored_files(tmp_path: Path) -> None:
