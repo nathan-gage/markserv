@@ -133,8 +133,7 @@ def test_directory_mode_redirects_to_readme_and_hides_gitignored_files(tmp_path:
         assert 'data-theme-btn="light"' in page_response.text
         assert 'data-theme-btn="dark"' in page_response.text
         assert "hit-area-1" in page_response.text
-        assert "hit-area-2" in page_response.text
-        assert "hit-area-x-2" in page_response.text
+        assert "/public/js/sidebar.js" in page_response.text
         assert "/public/vendor/htmx.min.js" in page_response.text
         assert 'name="htmx-config"' in page_response.text
         assert "historyRestoreAsHxRequest" in page_response.text
@@ -147,7 +146,8 @@ def test_directory_mode_redirects_to_readme_and_hides_gitignored_files(tmp_path:
 
         fragment_response = client.get("/docs/README.md", headers={"HX-Request": "true"})
         assert fragment_response.status_code == 200
-        assert 'id="page-shell"' in fragment_response.text
+        assert 'id="main-shell"' in fragment_response.text
+        assert 'id="sidebar-shell"' in fragment_response.text
         assert 'hx-swap-oob="true"' in fragment_response.text
         assert 'id="favicon"' in fragment_response.text
         assert 'hx-swap-oob="outerHTML"' in fragment_response.text
@@ -179,18 +179,18 @@ def test_htmx_redirects_use_hx_location_for_shell_swaps(tmp_path: Path) -> None:
     root_location = json.loads(root_fragment.headers["HX-Location"])
     assert root_location == {
         "path": "/docs/README.md",
-        "target": "#page-shell",
+        "target": "#main-shell",
         "swap": "outerHTML",
-        "select": "#page-shell",
+        "select": "#main-shell",
     }
 
     assert section_fragment.status_code == 204
     section_location = json.loads(section_fragment.headers["HX-Location"])
     assert section_location == {
         "path": "/docs/guides/README.md",
-        "target": "#page-shell",
+        "target": "#main-shell",
         "swap": "outerHTML",
-        "select": "#page-shell",
+        "select": "#main-shell",
     }
 
 
@@ -208,11 +208,11 @@ def test_markdown_doc_links_are_htmx_enhanced_without_touching_assets(tmp_path: 
 
     assert response.status_code == 200
     assert (
-        '<a href="/docs/guide.md" hx-get="/docs/guide.md" hx-target="#page-shell" hx-swap="outerHTML" hx-push-url="/docs/guide.md">Guide</a>'
+        '<a href="/docs/guide.md" hx-get="/docs/guide.md" hx-target="#main-shell" hx-select="#main-shell" hx-swap="outerHTML" hx-push-url="/docs/guide.md" hx-include="#sidebar-state">Guide</a>'
         in response.text
     )
     assert (
-        '<a href="/docs/guide.md#details" hx-get="/docs/guide.md" hx-target="#page-shell" hx-swap="outerHTML" hx-push-url="/docs/guide.md#details">Deep guide</a>'
+        '<a href="/docs/guide.md#details" hx-get="/docs/guide.md" hx-target="#main-shell" hx-select="#main-shell" hx-swap="outerHTML" hx-push-url="/docs/guide.md#details" hx-include="#sidebar-state">Deep guide</a>'
         in response.text
     )
     assert '<a href="diagram.png">Diagram</a>' in response.text

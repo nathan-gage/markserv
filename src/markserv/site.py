@@ -131,6 +131,7 @@ class NavFile:
 class NavDirectory:
     kind: Literal["dir"] = "dir"
     name: str = ""
+    path: str = ""
     open: bool = False
     children: tuple[NavNode, ...] = field(default_factory=tuple)
 
@@ -221,9 +222,30 @@ class PageIndex:
             key=lambda page: (page.rel_path.count("/"), *_page_sort_key(page)),
         )[0].rel_path
 
-    def nav_items(self, current_rel: str) -> tuple[NavNode, ...]:
+    def nav_items(
+        self,
+        current_rel: str,
+        open_paths: tuple[str, ...] = (),
+        *,
+        nav_state_explicit: bool = False,
+    ) -> tuple[NavNode, ...]:
         visible_pages = tuple(page for page in self.pages if not page.hidden)
-        return _build_nav_nodes(_build_nav_tree(visible_pages), current_rel)
+        return _build_nav_nodes(
+            _build_nav_tree(visible_pages),
+            current_rel,
+            open_paths=frozenset(open_paths),
+            nav_state_explicit=nav_state_explicit,
+        )
+
+    def directory_paths(self) -> tuple[str, ...]:
+        directories: set[str] = set()
+        for page in self.pages:
+            if page.hidden:
+                continue
+            parts = page.rel_path.split("/")
+            for index in range(1, len(parts)):
+                directories.add("/".join(parts[:index]))
+        return tuple(sorted(directories, key=lambda path: (path.count("/"), path.casefold())))
 
     def has_directory(self, rel_path: str) -> bool:
         normalized_path = rel_path.strip("/")
@@ -507,7 +529,14 @@ def _build_nav_tree(pages: Iterable[MarkdownPage]) -> NavTree:
     return root
 
 
-def _build_nav_nodes(tree: NavTree, current_rel: str, prefix: str = "") -> tuple[NavNode, ...]:
+def _build_nav_nodes(
+    tree: NavTree,
+    current_rel: str,
+    prefix: str = "",
+    *,
+    open_paths: frozenset[str] = frozenset(),
+    nav_state_explicit: bool = False,
+) -> tuple[NavNode, ...]:
     directories: list[tuple[str, NavTree]] = []
     files_only: list[MarkdownPage] = []
 
@@ -523,8 +552,15 @@ def _build_nav_nodes(tree: NavTree, current_rel: str, prefix: str = "") -> tuple
         items.append(
             NavDirectory(
                 name=directory_name,
-                open=current_rel.startswith(f"{rel_dir}/"),
-                children=_build_nav_nodes(child_tree, current_rel, rel_dir),
+                path=rel_dir,
+                open=rel_dir in open_paths or (not nav_state_explicit and current_rel.startswith(f"{rel_dir}/")),
+                children=_build_nav_nodes(
+                    child_tree,
+                    current_rel,
+                    rel_dir,
+                    open_paths=open_paths,
+                    nav_state_explicit=nav_state_explicit,
+                ),
             )
         )
 

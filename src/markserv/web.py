@@ -27,6 +27,7 @@ from .rendering import (
     render_empty_fragment,
     render_empty_page,
     render_search_results_fragment,
+    render_sidebar_fragment,
 )
 from .search import SearchIndex, build_search_index
 from .site import (
@@ -127,9 +128,9 @@ def _htmx_location_value(location: str) -> str:
     return json.dumps(
         {
             "path": location,
-            "target": "#page-shell",
+            "target": "#main-shell",
             "swap": "outerHTML",
-            "select": "#page-shell",
+            "select": "#main-shell",
         },
         separators=(",", ":"),
     )
@@ -142,12 +143,52 @@ def redirect_response(location: str, *, htmx: bool = False) -> Response:
     return RedirectResponse(location, status_code=307, headers=NO_CACHE_HEADERS)
 
 
+def _nav_open_paths(
+    raw_paths: list[str],
+    page_index: PageIndex,
+    *,
+    default_to_all: bool = False,
+) -> tuple[str, ...]:
+    if not raw_paths:
+        return page_index.directory_paths() if default_to_all else ()
+
+    paths: list[str] = []
+    seen: set[str] = set()
+
+    for raw_path in raw_paths:
+        try:
+            normalized = normalize_rel_path(raw_path)
+        except SitePathError:
+            continue
+        if not normalized or normalized in seen or not page_index.has_directory(normalized):
+            continue
+        seen.add(normalized)
+        paths.append(normalized)
+
+    return tuple(sorted(paths, key=lambda path: (path.count("/"), path.casefold())))
+
+
+def nav_open_paths_from_request(
+    request: Request,
+    page_index: PageIndex,
+    *,
+    default_to_all: bool = False,
+) -> tuple[str, ...]:
+    return _nav_open_paths(list(request.query_params.getlist("nav")), page_index, default_to_all=default_to_all)
+
+
+def nav_state_is_explicit_request(request: Request) -> bool:
+    return "nav_state" in request.query_params
+
+
 async def resolve_docs_response(
     site: SiteSource,
     page_index: PageIndex,
     requested_path: str,
     *,
     htmx: bool = False,
+    nav_open_paths: tuple[str, ...] = (),
+    nav_state_explicit: bool = False,
     dev_reload: bool = False,
 ) -> Response | DocsPageView:
     try:
@@ -164,7 +205,14 @@ async def resolve_docs_response(
     markdown_text = await asyncio.to_thread(site.read_markdown, rel_path)
     if markdown_text is not None:
         return await asyncio.to_thread(
-            build_docs_view, site, page_index, rel_path, markdown_text, dev_reload=dev_reload
+            build_docs_view,
+            site,
+            page_index,
+            rel_path,
+            markdown_text,
+            nav_open_paths=nav_open_paths,
+            nav_state_explicit=nav_state_explicit,
+            dev_reload=dev_reload,
         )
 
     asset_path = await asyncio.to_thread(site.resolve_asset, rel_path)
@@ -352,13 +400,20 @@ def create_app(config_or_site: ServeConfig | SiteSource) -> FastAPI:
     async def search_docs(request: Request, q: str = "", limit: int = 12) -> Response | dict[str, object]:
         query = q.strip()
         is_htmx = request.headers.get("hx-request") == "true"
+        page_index = await get_page_index()
+        nav_open_paths = nav_open_paths_from_request(request, page_index)
+        nav_state_explicit = nav_state_is_explicit_request(request)
         if not query:
             if is_htmx:
-                return HTMLResponse(render_search_results_fragment([], ""))
+                return HTMLResponse(
+                    render_search_results_fragment([], "", nav_open_paths, nav_state_explicit=nav_state_explicit)
+                )
             return {"results": []}
         results = await asyncio.to_thread((await get_search_index()).search, query, limit)
         if is_htmx:
-            return HTMLResponse(render_search_results_fragment(results, query))
+            return HTMLResponse(
+                render_search_results_fragment(results, query, nav_open_paths, nav_state_explicit=nav_state_explicit)
+            )
         return {"results": [result.to_payload() for result in results]}
 
     if dev_reload:
@@ -401,10 +456,11 @@ def create_app(config_or_site: ServeConfig | SiteSource) -> FastAPI:
     @app.get("/", response_model=None)
     @app.get("/docs", response_model=None)
     async def root(request: Request) -> Response:
+        page_index = await get_page_index()
         if site.default_doc is not None:
             return redirect_response(docs_href(site.default_doc), htmx=is_htmx_request(request))
 
-        home_doc = (await get_page_index()).choose_default_doc()
+        home_doc = page_index.choose_default_doc()
         if home_doc is not None:
             return redirect_response(docs_href(home_doc), htmx=is_htmx_request(request))
 
@@ -417,15 +473,23 @@ def create_app(config_or_site: ServeConfig | SiteSource) -> FastAPI:
 
     @app.get("/docs/{requested_path:path}", response_model=None)
     async def docs(request: Request, requested_path: str) -> Response:
+        page_index = await get_page_index()
         resolved = await resolve_docs_response(
             site,
-            await get_page_index(),
+            page_index,
             requested_path,
             htmx=is_htmx_request(request),
+            nav_open_paths=nav_open_paths_from_request(request, page_index, default_to_all=True),
+            nav_state_explicit=nav_state_is_explicit_request(request),
             dev_reload=dev_reload,
         )
         if isinstance(resolved, Response):
             return resolved
+
+        if is_htmx_request(request) and request.headers.get("hx-target") == "sidebar-shell":
+            return HTMLResponse(
+                await htmy.render_component(render_sidebar_fragment(resolved), request), headers=NO_CACHE_HEADERS
+            )
 
         return await render_view_response(
             request,
