@@ -109,15 +109,14 @@ _ICON_FOLDER_OPEN = SafeStr(
 )
 
 
-def _flatten_nav(items: tuple[NavNode, ...]) -> list[NavFile]:
-    """Recursively collect all files from a nav tree."""
-    result: list[NavFile] = []
-    for item in items:
-        if isinstance(item, NavDirectory):
-            result.extend(_flatten_nav(item.children))
-        else:
-            result.append(item)
-    return result
+_ICON_CHEVRON = SafeStr(
+    '<svg class="nav-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none"'
+    ' stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">'
+    '<path d="m9 18 6-6-6-6"/></svg>'
+)
+
+_NAV_TREE_BASE = 0.65  # rem – left padding for depth-0 items
+_NAV_TREE_STEP = 1.2  # rem added per nesting depth
 
 
 def _htmx_request_href(href: str) -> str | None:
@@ -192,29 +191,39 @@ def _enhance_markdown_links(rendered_html: str, current_rel_path: str) -> str:
     return ANCHOR_TAG_RE.sub(replace, rendered_html)
 
 
-def _nav_link(nav_file: NavFile) -> ComponentType:
+def _nav_tree_pad(depth: int) -> str:
+    return f"padding-left: {_NAV_TREE_BASE + depth * _NAV_TREE_STEP}rem"
+
+
+def _nav_tree_item(nav_file: NavFile, depth: int) -> ComponentType:
+    """Render a file link at the given tree depth."""
     cls = "nav-link is-active" if nav_file.active else "nav-link"
-    return html.a(nav_file.label, href=nav_file.href, class_=cls, **_htmx_nav_attrs(nav_file.href))
+    return html.a(nav_file.label, href=nav_file.href, class_=cls, style=_nav_tree_pad(depth), **_htmx_nav_attrs(nav_file.href))
 
 
-def _render_section_children(children: tuple[NavNode, ...], group: list[ComponentType]) -> None:
-    """Render a section's children: direct files first, then sub-dirs as sub-sections."""
-    for child in children:
+def _nav_tree_folder(directory: NavDirectory, depth: int, path_prefix: str = "") -> ComponentType:
+    """Render a collapsible folder with its children at the given tree depth."""
+    folder_path = f"{path_prefix}/{directory.name}" if path_prefix else directory.name
+    icon = _ICON_FOLDER_OPEN if directory.open else _ICON_FOLDER
+    header = html.summary(
+        _ICON_CHEVRON,
+        icon,
+        html.span(humanize_name(directory.name), class_="nav-folder-name"),
+        class_="nav-folder-header",
+        style=_nav_tree_pad(depth),
+    )
+    children: list[ComponentType] = [header]
+    child_depth = depth + 1
+    for child in directory.children:
         if not isinstance(child, NavDirectory):
-            group.append(_nav_link(child))
-    for child in children:
+            children.append(_nav_tree_item(child, child_depth))
+    for child in directory.children:
         if isinstance(child, NavDirectory):
-            sub_icon = _ICON_FOLDER_OPEN if child.open else _ICON_FOLDER
-            sub: list[ComponentType] = [
-                html.div(
-                    sub_icon,
-                    html.span(humanize_name(child.name), class_="nav-subsection-label"),
-                    class_="nav-subsection",
-                ),
-            ]
-            for f in _flatten_nav(child.children):
-                sub.append(_nav_link(f))
-            group.append(html.div(*sub, class_="nav-subgroup"))
+            children.append(_nav_tree_folder(child, child_depth, folder_path))
+    attrs: dict[str, str] = {"class_": "nav-folder", "data_path": folder_path}
+    if directory.open:
+        attrs["open"] = ""
+    return html.details(*children, **attrs)
 
 
 def render_nav_items(items: tuple[NavNode, ...]) -> ComponentType:
@@ -222,18 +231,12 @@ def render_nav_items(items: tuple[NavNode, ...]) -> ComponentType:
         return Fragment()
 
     elements: list[ComponentType] = []
-    root_links = [_nav_link(item) for item in items if not isinstance(item, NavDirectory)]
-    if root_links:
-        elements.append(html.div(*root_links, class_="nav-group"))
     for item in items:
         if not isinstance(item, NavDirectory):
-            continue
-        icon = _ICON_FOLDER_OPEN if item.open else _ICON_FOLDER
-        group: list[ComponentType] = [
-            html.div(icon, html.span(humanize_name(item.name), class_="nav-section-label"), class_="nav-section"),
-        ]
-        _render_section_children(item.children, group)
-        elements.append(html.div(*group, class_="nav-group"))
+            elements.append(_nav_tree_item(item, depth=0))
+    for item in items:
+        if isinstance(item, NavDirectory):
+            elements.append(_nav_tree_folder(item, depth=0))
 
     return html.nav(*elements, class_="nav-list")
 

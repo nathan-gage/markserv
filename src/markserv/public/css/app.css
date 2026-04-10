@@ -662,74 +662,86 @@ a.sidebar-title:hover {
   flex: 1;
 }
 
-.nav-group {
-  margin-top: 0.45rem;
-}
-
 .nav-icon {
   flex-shrink: 0;
   opacity: 0.55;
 }
 
-.nav-section {
-  display: flex;
-  align-items: center;
-  gap: 0.38rem;
-  min-width: 0;
-  font-size: 0.78rem;
-  font-weight: 700;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 0.48rem 0.65rem 0.18rem;
+/* Collapsible folder tree */
+
+.nav-folder {
+  margin: 0;
 }
 
-.nav-subsection {
+.nav-folder > summary {
+  list-style: none;
+}
+
+.nav-folder > summary::-webkit-details-marker {
+  display: none;
+}
+
+.nav-folder-header {
   display: flex;
   align-items: center;
   gap: 0.3rem;
-  min-width: 0;
-  font-size: 0.78rem;
-  font-weight: 600;
+  padding: 0.3rem 0.65rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 500;
   color: var(--muted);
-  padding: 0.42rem 0.65rem 0.12rem 1.35rem;
-}
-
-.nav-section-label,
-.nav-subsection-label {
+  border-radius: 0.35rem;
+  user-select: none;
   min-width: 0;
 }
 
-.sidebar-animating .nav-section-label,
-.sidebar-animating .nav-subsection-label,
+.nav-folder-header:hover {
+  background: rgb(127 127 127 / 8%);
+}
+
+.nav-folder-header .nav-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.nav-chevron {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  opacity: 0.4;
+  transition: transform 0.15s ease;
+}
+
+.nav-folder[open] > .nav-folder-header > .nav-chevron {
+  transform: rotate(90deg);
+}
+
+.nav-folder-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.sidebar-animating .nav-folder-name,
 .sidebar-animating .nav-link,
-.sidebar-resizing .nav-section-label,
-.sidebar-resizing .nav-subsection-label,
+.sidebar-resizing .nav-folder-name,
 .sidebar-resizing .nav-link {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.nav-subsection .nav-icon {
-  width: 12px;
-  height: 12px;
-}
-
 .nav-link {
   display: block;
   min-width: 0;
-  padding: 0.42rem 0.65rem 0.42rem 1.35rem;
+  padding: 0.32rem 0.65rem;
   border-radius: 0.45rem;
   color: var(--text);
   text-decoration: none;
-  font-size: 0.92rem;
+  font-size: 0.88rem;
   line-height: 1.35;
   transition: background 0.15s, color 0.15s;
-}
-
-.nav-subgroup .nav-link {
-  padding-left: 2.25rem;
 }
 
 .nav-link:hover {

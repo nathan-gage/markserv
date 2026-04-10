@@ -2,12 +2,14 @@
   const WIDTH_KEY = "markserv-sidebar-width";
   const PAGE_SHELL = "#page-shell";
   const COLLAPSED_KEY = "markserv-sidebar-collapsed";
+  const FOLDER_STATE_KEY = "markserv-folder-states";
   const MIN_WIDTH = 180;
   const MAX_WIDTH = 500;
   const DEFAULT_WIDTH = 260;
   const ANIMATION_MS = 380;
 
   let animationTimer = null;
+  let restoringFolders = false;
 
   function isPageShellTarget(target) {
     return target instanceof Element && target.matches(PAGE_SHELL);
@@ -55,13 +57,65 @@
     }, ANIMATION_MS);
   }
 
+  // --- Folder toggle persistence ---
+
+  function savedFolderStates() {
+    try {
+      return JSON.parse(localStorage.getItem(FOLDER_STATE_KEY)) || {};
+    } catch {
+      return {};
+    }
+  }
+
+  function saveFolderState(path, open) {
+    try {
+      const states = savedFolderStates();
+      states[path] = open;
+      localStorage.setItem(FOLDER_STATE_KEY, JSON.stringify(states));
+    } catch {}
+  }
+
+  function restoreFolderStates() {
+    const saved = savedFolderStates();
+    restoringFolders = true;
+    document.querySelectorAll(".nav-folder[data-path]").forEach((folder) => {
+      const path = folder.dataset.path;
+      const serverOpen = folder.open;
+      if (serverOpen) {
+        // Server marked this open (contains active page) — always keep open.
+        return;
+      }
+      if (path in saved) {
+        folder.open = saved[path];
+      }
+    });
+    restoringFolders = false;
+  }
+
+  // Save toggle state when user opens/closes a folder.
+  document.addEventListener(
+    "toggle",
+    (e) => {
+      if (restoringFolders) return;
+      const folder = e.target;
+      if (folder.classList?.contains("nav-folder") && folder.dataset.path) {
+        saveFolderState(folder.dataset.path, folder.open);
+      }
+    },
+    true,
+  );
+
   // Apply immediately to avoid flash.
   applySidebarState();
 
-  document.addEventListener("DOMContentLoaded", applySidebarState);
+  document.addEventListener("DOMContentLoaded", () => {
+    applySidebarState();
+    restoreFolderStates();
+  });
   document.addEventListener("htmx:afterSwap", (event) => {
     if (isPageShellTarget(event.target)) {
       applySidebarState();
+      restoreFolderStates();
     }
   });
 
