@@ -24,6 +24,7 @@ This sample tree exists so you can quickly try the renderer, sidebar navigation,
 
 ## Try these pages
 
+- [Project overview](guides/project-overview.md)
 - [Quickstart](guides/quickstart.md)
 - [YAML front matter demo](guides/features/front-matter.md)
 - [GitHub-flavored markdown examples](guides/features/gfm.md)
@@ -32,6 +33,7 @@ This sample tree exists so you can quickly try the renderer, sidebar navigation,
 
 ## What to try
 
+- Start with the [project overview](guides/project-overview.md).
 - Notice that sidebar labels and ordering come from YAML front matter.
 - Open the [front matter demo](guides/features/front-matter.md).
 - Follow a link to the [hidden page](reference/hidden-page.md), which is routable but omitted from the sidebar.
@@ -39,6 +41,47 @@ This sample tree exists so you can quickly try the renderer, sidebar navigation,
 - Resize the window to see the responsive layout.
 
 > markserv is meant to feel nice for local docs, READMEs, and note collections.
+""",
+    "guides/project-overview.md": """
+# Project overview
+
+markserv turns a Markdown file or docs folder into a clean local site for READMEs, notes, and lightweight project docs.
+
+It supports GitHub-flavored markdown, syntax highlighting, heading anchors, live reload, sidebar navigation, and theme switching out of the box.
+
+## Included
+
+- [x] GitHub-flavored Markdown
+- [x] Syntax-highlighted fenced code blocks
+- [x] Automatic heading anchors
+- [x] Sidebar navigation for docs folders
+- [x] System, light, and dark themes
+
+## Quick start
+
+```bash
+uv tool install markserv
+markserv README.md
+markserv docs/
+```
+
+## Front matter
+
+```yaml
+---
+title: Deployment guide
+nav_order: 10
+hidden: false
+---
+```
+
+## Good fit
+
+| Use case | Why it fits |
+| --- | --- |
+| Project README | Open a polished local view in one command |
+| Team notes | Keep docs in plain Markdown |
+| Docs folder | Browse nested pages from a generated sidebar |
 """,
     "guides/quickstart.md": """---
 title: Quickstart Guide
@@ -170,6 +213,7 @@ A small page for cross-link testing.
 
 - [Back home](../README.md)
 - [Quickstart](../guides/quickstart.md)
+- [Project overview](../guides/project-overview.md)
 - [Deep dive](../guides/nested/deep-dive.md)
 - [Hidden page](hidden-page.md)
 

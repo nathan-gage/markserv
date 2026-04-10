@@ -13,8 +13,8 @@ def test_demo_site_contains_nested_markdown() -> None:
     markdown_files = {page.rel_path for page in site.page_index().pages}
 
     assert "README.md" in markdown_files
+    assert "guides/project-overview.md" in markdown_files
     assert "guides/quickstart.md" in markdown_files
-    assert "guides/features/showcase.md" in markdown_files
     assert "guides/features/front-matter.md" in markdown_files
     assert "guides/features/gfm.md" in markdown_files
     assert "guides/nested/deep-dive.md" in markdown_files
@@ -33,16 +33,17 @@ def test_demo_site_renders_without_filesystem_fixture() -> None:
         assert "Demo Home · markserv" in home_response.text
         assert ">Welcome<" in home_response.text
         assert ">Start Here<" in home_response.text
+        assert ">project overview<" in home_response.text
         assert ">Hidden page<" not in home_response.text
 
-        showcase_response = client.get("/docs/guides/features/showcase.md")
-        assert showcase_response.status_code == 200
-        assert "Feature showcase · markserv" in showcase_response.text
-        assert ">Feature tour<" in showcase_response.text
-        assert '<pre class="highlight" data-language="python">' in showcase_response.text
-        assert "Loaded" in showcase_response.text
-        assert "markdown pages" in showcase_response.text
-        assert 'href="../../reference/hidden-page.md"' in showcase_response.text
+        overview_response = client.get("/docs/guides/project-overview.md")
+        assert overview_response.status_code == 200
+        assert "Project overview · markserv" in overview_response.text
+        assert 'type="checkbox"' in overview_response.text
+        assert '<pre class="highlight" data-language="bash">' in overview_response.text
+        assert '<pre class="highlight" data-language="yaml">' in overview_response.text
+        assert "GitHub-flavored markdown" in overview_response.text
+        assert "Project README" in overview_response.text
 
         page_response = client.get("/docs/guides/features/front-matter.md")
         assert page_response.status_code == 200
@@ -63,17 +64,19 @@ def test_demo_front_matter_controls_labels_and_ordering() -> None:
     page_index = site.page_index()
 
     home_page = page_index.page_for("README.md")
+    overview_page = page_index.page_for("guides/project-overview.md")
     quickstart_page = page_index.page_for("guides/quickstart.md")
     hidden_page = page_index.page_for("reference/hidden-page.md")
 
     assert home_page is not None and home_page.label == "Welcome"
+    assert overview_page is not None and overview_page.label == "project overview"
     assert quickstart_page is not None and quickstart_page.label == "Start Here"
     assert hidden_page is not None and hidden_page.hidden is True
 
     with TestClient(create_app(site)) as client:
-        response = client.get("/docs/guides/features/showcase.md")
+        response = client.get("/docs/guides/project-overview.md")
         assert response.status_code == 200
-        assert response.text.index(">Feature tour<") < response.text.index(">Front matter<")
+        assert response.text.index(">Start Here<") < response.text.index(">project overview<")
         assert response.text.index(">Front matter<") < response.text.index(">GFM examples<")
 
 
