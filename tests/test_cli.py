@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import threading
 from pathlib import Path
 
@@ -109,6 +110,68 @@ def test_cli_allows_disabling_browser_open(monkeypatch: pytest.MonkeyPatch, tmp_
     assert observed["server"] is fake_server
     assert observed["host"] == cli.DEFAULT_HOST
     assert observed["port"] == cli.DEFAULT_PORT
+
+
+def test_cli_uses_uvicorn_reload_when_env_var_set(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    markdown_file = tmp_path / "README.md"
+    markdown_file.write_text("# Home\n", encoding="utf-8")
+
+    observed: dict[str, object] = {}
+
+    class ImmediateTimer:
+        def __init__(self, interval: float, function: object) -> None:
+            observed["timer_interval"] = interval
+            observed["timer_function"] = function
+
+        def start(self) -> None:
+            timer_function = observed["timer_function"]
+            assert callable(timer_function)
+            timer_function()
+
+    def fake_open(url: str) -> bool:
+        observed["opened_url"] = url
+        return True
+
+    def fake_run_python_reloading_server(app_factory: str, *, host: str, port: int) -> None:
+        observed["app_factory"] = app_factory
+        observed["kwargs"] = {
+            "factory": True,
+            "host": host,
+            "port": port,
+            "reload": True,
+            "reload_dirs": [str(cli.PYTHON_RELOAD_DIR)],
+            "log_level": "warning",
+            "access_log": False,
+            "log_config": None,
+        }
+        observed["target_env"] = os.environ.get(cli.TARGET_ENV_VAR)
+
+    def fail_create_app(_site: object) -> object:
+        raise AssertionError("create_app should not be called when Python reload is enabled")
+
+    monkeypatch.setenv(cli.PYTHON_RELOAD_ENV_VAR, "1")
+    monkeypatch.setattr("markserv.cli.threading.Timer", ImmediateTimer)
+    monkeypatch.setattr("markserv.cli.webbrowser.open", fake_open)
+    monkeypatch.setattr(cli, "create_app", fail_create_app)
+    monkeypatch.setattr(cli, "run_python_reloading_server", fake_run_python_reloading_server)
+
+    cli.main([str(markdown_file), "--host", "0.0.0.0", "--port", "9000"])
+
+    assert observed["app_factory"] == "markserv.cli:create_app_from_env"
+    assert observed["target_env"] == str(markdown_file.resolve())
+    assert observed["opened_url"] == "http://localhost:9000"
+    assert observed["timer_interval"] == 0.8
+    assert observed["kwargs"] == {
+        "factory": True,
+        "host": "0.0.0.0",
+        "port": 9000,
+        "reload": True,
+        "reload_dirs": [str(cli.PYTHON_RELOAD_DIR)],
+        "log_level": "warning",
+        "access_log": False,
+        "log_config": None,
+    }
+    assert cli.TARGET_ENV_VAR not in os.environ
 
 
 def test_request_server_shutdown_marks_server_and_event() -> None:

@@ -7,9 +7,11 @@ import select
 import sys
 import threading
 import webbrowser
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Annotated, Any, Protocol
 
+import uvicorn
 from cyclopts import App, Parameter
 from cyclopts.help import PlainFormatter
 from cyclopts.token import Token
@@ -31,6 +33,9 @@ console = Console(stderr=True)
 QUIT_KEYS = {"q", "Q", "\x1b"}
 DEFAULT_HOST = "localhost"
 DEFAULT_PORT = 4422
+PYTHON_RELOAD_ENV_VAR = "MARKSERV_PYTHON_RELOAD"
+TARGET_ENV_VAR = "MARKSERV_TARGET"
+PYTHON_RELOAD_DIR = Path(__file__).resolve().parent
 
 app = App(
     name="markserv",
@@ -69,15 +74,43 @@ def browser_url(host: str, port: int) -> str:
     return f"http://{public_host}:{port}"
 
 
-def print_startup_banner(*, source: str, root_dir: str, url: str, open_browser: bool) -> None:
-    quit_hint = "Press Q or Esc to quit." if _supports_quit_prompt() else "Press Ctrl+C to quit."
+def python_reload_enabled() -> bool:
+    value = os.environ.get(PYTHON_RELOAD_ENV_VAR, "")
+    return value.lower() in {"1", "true", "yes", "on"}
+
+
+@contextlib.contextmanager
+def temporary_env(updates: Mapping[str, str]) -> Any:
+    previous = {key: os.environ.get(key) for key in updates}
+    os.environ.update(updates)
+    try:
+        yield
+    finally:
+        for key, value in previous.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+
+
+def print_startup_banner(*, source: str, root_dir: str, url: str, open_browser: bool, python_reload: bool) -> None:
+    quit_hint = (
+        "Press Ctrl+C to quit."
+        if python_reload
+        else "Press Q or Esc to quit."
+        if _supports_quit_prompt()
+        else "Press Ctrl+C to quit."
+    )
     browser_hint = "Browser opens automatically." if open_browser else "Browser auto-open disabled."
+    reload_hint = "Python reload enabled via MARKSERV_PYTHON_RELOAD." if python_reload else None
     display_url = url.removeprefix("http://")
 
     console.print(f"[bold cyan]markserv[/] serving {source}")
     console.print(f"[cyan]root[/] {root_dir}")
     console.print(f"[cyan]url[/] [link={url}][underline]{display_url}[/underline][/link]")
     console.print(f"[dim]{browser_hint}[/]")
+    if reload_hint is not None:
+        console.print(f"[dim]{reload_hint}[/]")
     console.print(f"[dim]{quit_hint}[/]")
 
 
@@ -91,6 +124,20 @@ def create_server(app: Any, *, host: str, port: int) -> Server:
             access_log=False,
             log_config=None,
         )
+    )
+
+
+def run_python_reloading_server(app_factory_import: str, *, host: str, port: int) -> None:
+    uvicorn.run(
+        app_factory_import,
+        factory=True,
+        host=host,
+        port=port,
+        reload=True,
+        reload_dirs=[str(PYTHON_RELOAD_DIR)],
+        log_level="warning",
+        access_log=False,
+        log_config=None,
     )
 
 
@@ -149,20 +196,39 @@ def run_server(server: StoppableServer) -> None:
 
 
 def serve_application(
-    application: Any,
+    application: Any | None,
     *,
     source: str,
     root_dir: str,
     host: str,
     port: int,
     open_browser: bool,
+    app_factory_import: str | None = None,
+    env_updates: Mapping[str, str] | None = None,
 ) -> None:
     configure_logging()
     url = browser_url(host, port)
-    print_startup_banner(source=source, root_dir=root_dir, url=url, open_browser=open_browser)
+    python_reload = python_reload_enabled()
+    print_startup_banner(
+        source=source,
+        root_dir=root_dir,
+        url=url,
+        open_browser=open_browser,
+        python_reload=python_reload,
+    )
 
     if open_browser:
         threading.Timer(0.8, lambda: webbrowser.open(url)).start()
+
+    if python_reload:
+        if app_factory_import is None:
+            raise ValueError("app_factory_import is required when Python reload is enabled")
+        with temporary_env(dict(env_updates or {})):
+            run_python_reloading_server(app_factory_import, host=host, port=port)
+        return
+
+    if application is None:
+        raise ValueError("application is required when Python reload is disabled")
 
     server = create_server(application, host=host, port=port)
     run_server(server)
@@ -190,13 +256,23 @@ def serve(
     config = build_config(path)
     site = build_file_site(config)
     serve_application(
-        create_app(site),
+        None if python_reload_enabled() else create_app(site),
         source=str(config.source),
         root_dir=str(config.root_dir),
         host=host,
         port=port,
         open_browser=open_browser,
+        app_factory_import="markserv.cli:create_app_from_env",
+        env_updates={TARGET_ENV_VAR: str(config.source)},
     )
+
+
+def create_app_from_env() -> Any:
+    target = os.environ.get(TARGET_ENV_VAR)
+    if not target:
+        raise RuntimeError(f"{TARGET_ENV_VAR} must be set when Python reload is enabled")
+    config = build_config(Path(target))
+    return create_app(build_file_site(config))
 
 
 def main(argv: list[str] | None = None) -> None:

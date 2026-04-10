@@ -6,7 +6,7 @@ from cyclopts import App, Parameter
 from cyclopts.help import PlainFormatter
 
 from .app import create_app
-from .cli import DEFAULT_HOST, DEFAULT_PORT, serve_application
+from .cli import DEFAULT_HOST, DEFAULT_PORT, python_reload_enabled, serve_application
 from .site import SyntheticSite
 
 DEMO_DOCUMENTS = {
@@ -120,7 +120,7 @@ GitHub-flavored markdown rendering should also tolerate small inline HTML snippe
 """,
 }
 
-__all__ = ["DEFAULT_HOST", "DEFAULT_PORT", "build_demo_site", "main", "serve_demo"]
+__all__ = ["DEFAULT_HOST", "DEFAULT_PORT", "build_demo_site", "create_demo_app", "main", "serve_demo"]
 
 app = App(
     name="markserv.demo",
@@ -139,15 +139,20 @@ def build_demo_site() -> SyntheticSite:
     )
 
 
+def create_demo_app() -> object:
+    return create_app(build_demo_site())
+
+
 def serve_demo(*, host: str, port: int, open_browser: bool) -> None:
     site = build_demo_site()
     serve_application(
-        create_app(site),
+        None if python_reload_enabled() else create_app(site),
         source="markserv demo",
         root_dir=site.root_label,
         host=host,
         port=port,
         open_browser=open_browser,
+        app_factory_import="markserv.demo:create_demo_app",
     )
 
 
