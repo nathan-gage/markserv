@@ -7,9 +7,9 @@ import os
 from collections.abc import AsyncIterator, Awaitable, Callable
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi import Response as FastAPIResponse
-from fastapi.responses import FileResponse, RedirectResponse, Response, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response, StreamingResponse
 from fasthx.htmy import HTMY
 from watchfiles import awatch
 
@@ -24,6 +24,7 @@ from .rendering import (
     render_docs_page,
     render_empty_fragment,
     render_empty_page,
+    render_search_results_fragment,
 )
 from .search import SearchIndex, build_search_index
 from .site import (
@@ -329,12 +330,17 @@ def create_app(config_or_site: ServeConfig | SiteSource) -> FastAPI:
             },
         )
 
-    @app.get("/_search")
-    async def search_docs(q: str = "", limit: int = 12) -> dict[str, object]:
+    @app.get("/_search", response_model=None)
+    async def search_docs(request: Request, q: str = "", limit: int = 12) -> Response | dict[str, object]:
         query = q.strip()
+        is_htmx = request.headers.get("hx-request") == "true"
         if not query:
+            if is_htmx:
+                return HTMLResponse(render_search_results_fragment([], ""))
             return {"results": []}
         results = await asyncio.to_thread((await get_search_index()).search, query, limit)
+        if is_htmx:
+            return HTMLResponse(render_search_results_fragment(results, query))
         return {"results": [result.to_payload() for result in results]}
 
     if dev_reload:

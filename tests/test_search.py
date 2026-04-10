@@ -22,7 +22,7 @@ def test_search_ui_assets_are_included_in_rendered_page(tmp_path: Path) -> None:
     assert response.status_code == 200
     assert "/public/js/search.js" in response.text
     assert 'data-search-open=""' in response.text
-    assert 'data-search-overlay=""' in response.text
+    assert 'data-search-dialog=""' in response.text
     assert 'data-search-input=""' in response.text
     assert 'data-search-results=""' in response.text
 

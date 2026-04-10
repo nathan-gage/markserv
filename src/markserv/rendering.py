@@ -2,12 +2,19 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from html import escape as _html_escape
+from typing import TYPE_CHECKING
 from urllib.parse import quote
 
 from htmy import Component, ComponentType, Fragment, SafeStr, html
 
 from .markdown import render_markdown
 from .site import NavDirectory, NavFile, NavNode, PageIndex, SiteSource, humanize_name
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from .search import SearchResult
 
 TITLE_RE = re.compile(r"^\s{0,3}#\s+(.+?)\s*$", re.MULTILINE)
 
@@ -403,47 +410,48 @@ def search_chrome() -> ComponentType:
             html.span("Search", class_="search-trigger-label"),
             html.span("Cmd/Ctrl K", class_="search-trigger-shortcut", data_search_shortcut=""),
             type="button",
-            class_="search-trigger hit-area-1",
+            class_="search-trigger",
             data_search_open="",
             aria_label="Open search",
             title="Search docs (Cmd/Ctrl+K)",
         ),
-        html.div(
-            html.button(
-                type="button",
-                class_="search-backdrop",
-                data_search_close="",
-                aria_label="Close search",
-            ),
+        html.dialog(
             html.div(
                 html.div(
                     html.span(SafeStr(_ICON_SEARCH), class_="search-input-icon"),
                     html.input_(
                         type="search",
                         class_="search-input",
+                        name="q",
                         placeholder="Search pages, headings, and content",
                         autocomplete="off",
                         autocapitalize="off",
                         spellcheck="false",
                         data_search_input="",
                         aria_label="Search docs",
+                        hx_get="/_search",
+                        hx_trigger="input delay:100ms, search",
+                        hx_target="[data-search-results]",
+                        hx_swap="innerHTML",
                     ),
-                    html.button(
-                        "Esc",
-                        type="button",
-                        class_="search-close hit-area-1",
-                        data_search_close="",
-                        aria_label="Close search",
+                    html.form(
+                        html.button(
+                            "Esc",
+                            type="submit",
+                            class_="search-close hit-area-1",
+                            aria_label="Close search",
+                        ),
+                        method="dialog",
+                        class_="search-close-form",
                     ),
                     class_="search-modal-header",
                 ),
                 html.div(
-                    html.p(
-                        "Start typing to search pages, headings, and content.",
-                        class_="search-state",
-                        data_search_state="",
-                    ),
                     html.div(
+                        html.p(
+                            "Start typing to search pages, headings, and content.",
+                            class_="search-state",
+                        ),
                         class_="search-results",
                         data_search_results="",
                         role="listbox",
@@ -454,8 +462,8 @@ def search_chrome() -> ComponentType:
                 html.div(
                     html.span("Pages, headings, and body text", class_="search-footer-copy"),
                     html.div(
-                        html.kbd("↑"),
-                        html.kbd("↓"),
+                        html.kbd("\u2191"),
+                        html.kbd("\u2193"),
                         html.span("move"),
                         html.kbd("Enter"),
                         html.span("open"),
@@ -464,15 +472,35 @@ def search_chrome() -> ComponentType:
                     class_="search-modal-footer",
                 ),
                 class_="search-modal",
-                role="dialog",
-                aria_modal="true",
-                aria_label="Search docs",
             ),
-            class_="search-overlay",
-            data_search_overlay="",
-            hidden="hidden",
+            class_="search-dialog",
+            data_search_dialog="",
+            aria_label="Search docs",
         ),
     )
+
+
+def render_search_results_fragment(results: Sequence[SearchResult], query: str) -> str:
+    """Render search results as an HTML fragment for HTMX swap."""
+    if not query.strip():
+        return '<p class="search-state">Start typing to search pages, headings, and content.</p>'
+    if not results:
+        return '<p class="search-state">No matching docs found.</p>'
+    parts: list[str] = []
+    for r in results:
+        snippet = ""
+        if r.snippet:
+            snippet = f'<span class="search-result-snippet">{_html_escape(r.snippet)}</span>'
+        parts.append(
+            f'<a href="{_html_escape(r.href)}" class="search-result">'
+            f'<span class="search-result-header">'
+            f'<span class="search-result-title">{_html_escape(r.title)}</span>'
+            f'<span class="search-result-path">{_html_escape(r.rel_path)}</span>'
+            f"</span>"
+            f"{snippet}"
+            f"</a>"
+        )
+    return "".join(parts)
 
 
 def base_document(
