@@ -166,34 +166,34 @@ body {
 
 /* ── View Transition: dialog open/close ───────────────── */
 
-/* Root group: cross-fades the backdrop dim */
+/* Root group: clean backdrop crossfade */
 ::view-transition-old(root),
 ::view-transition-new(root) {
-  animation-duration: 0.16s;
+  animation-duration: 0.18s;
   animation-timing-function: ease-out;
 }
 
-/* Dialog entering (only new snapshot exists → :only-child) */
+/* Dialog entering — smooth glide down */
 ::view-transition-new(search-dialog):only-child {
-  animation: search-in 0.16s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: search-in 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-/* Dialog exiting (only old snapshot exists) */
+/* Dialog exiting — quick fade up */
 ::view-transition-old(search-dialog):only-child {
-  animation: search-out 0.1s ease-in both;
+  animation: search-out 0.12s ease-out both;
 }
 
 @keyframes search-in {
   from {
     opacity: 0;
-    transform: translateY(-8px) scale(0.97);
+    transform: translateY(-6px);
   }
 }
 
 @keyframes search-out {
   to {
     opacity: 0;
-    transform: translateY(-4px) scale(0.99);
+    transform: translateY(-3px);
   }
 }
 
