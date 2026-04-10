@@ -2,6 +2,8 @@
 
 TOML_FILES := pyproject.toml
 TAPLO := uv run taplo
+YAMLFIX := uv run yamlfix
+YAML_PATHS := .github
 
 .PHONY: .uv
 .uv: ## Check that uv is installed
@@ -41,8 +43,12 @@ format-python: ## Format Python code
 format-toml: ## Format TOML files
 	$(TAPLO) format $(TOML_FILES)
 
+.PHONY: format-yaml
+format-yaml: ## Format YAML files with yamlfix
+	$(YAMLFIX) $(YAML_PATHS)
+
 .PHONY: format
-format: format-python format-toml ## Format the codebase
+format: format-python format-toml format-yaml ## Format the codebase
 
 .PHONY: format-check-python
 format-check-python: ## Check Python formatting without modifying files
@@ -52,8 +58,12 @@ format-check-python: ## Check Python formatting without modifying files
 format-check-toml: ## Check TOML formatting without modifying files
 	$(TAPLO) format --check $(TOML_FILES)
 
+.PHONY: format-check-yaml
+format-check-yaml: ## Check YAML formatting without modifying files
+	$(YAMLFIX) --check $(YAML_PATHS)
+
 .PHONY: format-check
-format-check: format-check-python format-check-toml ## Check formatting without modifying files
+format-check: format-check-python format-check-toml format-check-yaml ## Check formatting without modifying files
 
 .PHONY: lint
 lint: ## Lint the code

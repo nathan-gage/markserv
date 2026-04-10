@@ -95,7 +95,7 @@ jobs:
 
     steps:
       - name: Verify all required jobs passed
-        run: |
+        run: |-
           echo "checks: ${{ needs.checks.result }}"
           echo "tests: ${{ needs.tests.result }}"
 
