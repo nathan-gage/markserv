@@ -34,7 +34,7 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
-      - name: Detect Python-related changes
+      - name: Detect Python, uv, or CI changes
         id: filter
         uses: dorny/paths-filter@v4.0.1
         with:
@@ -44,8 +44,10 @@ jobs:
               - '.python-version'
               - 'Makefile'
               - '**/*.py'
+              - '**/*.pyi'
               - 'pyproject.toml'
               - 'uv.lock'
+              - 'uv.toml'
 
   checks:
     name: checks / ubuntu / py3.14
