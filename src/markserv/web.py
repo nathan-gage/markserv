@@ -7,9 +7,9 @@ import os
 from collections.abc import AsyncIterator, Awaitable, Callable
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi import Response as FastAPIResponse
-from fastapi.responses import FileResponse, RedirectResponse, Response, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response, StreamingResponse
 from fasthx.htmy import HTMY
 from watchfiles import awatch
 
@@ -24,7 +24,9 @@ from .rendering import (
     render_docs_page,
     render_empty_fragment,
     render_empty_page,
+    render_search_results_fragment,
 )
+from .search import SearchIndex, build_search_index
 from .site import (
     PageIndex,
     ServeConfig,
@@ -206,7 +208,9 @@ def create_app(config_or_site: ServeConfig | SiteSource) -> FastAPI:
     dev_reload = python_reload_enabled()
     htmy = HTMY(stream=False)
     page_index_cache: PageIndex | None = None
+    search_index_cache: SearchIndex | None = None
     page_index_lock = asyncio.Lock()
+    search_index_lock = asyncio.Lock()
 
     async def get_page_index() -> PageIndex:
         nonlocal page_index_cache
@@ -222,10 +226,27 @@ def create_app(config_or_site: ServeConfig | SiteSource) -> FastAPI:
                 page_index_cache = cached
         return cached
 
+    async def get_search_index() -> SearchIndex:
+        nonlocal search_index_cache
+
+        cached = search_index_cache
+        if cached is not None:
+            return cached
+
+        page_index = await get_page_index()
+        async with search_index_lock:
+            cached = search_index_cache
+            if cached is None:
+                cached = await asyncio.to_thread(build_search_index, site, page_index)
+                search_index_cache = cached
+        return cached
+
     async def invalidate_site_caches() -> None:
-        nonlocal page_index_cache
+        nonlocal page_index_cache, search_index_cache
         async with page_index_lock:
             page_index_cache = None
+        async with search_index_lock:
+            search_index_cache = None
         icon_cache.clear()
 
     @contextlib.asynccontextmanager
@@ -308,6 +329,19 @@ def create_app(config_or_site: ServeConfig | SiteSource) -> FastAPI:
                 "X-Accel-Buffering": "no",
             },
         )
+
+    @app.get("/_search", response_model=None)
+    async def search_docs(request: Request, q: str = "", limit: int = 12) -> Response | dict[str, object]:
+        query = q.strip()
+        is_htmx = request.headers.get("hx-request") == "true"
+        if not query:
+            if is_htmx:
+                return HTMLResponse(render_search_results_fragment([], ""))
+            return {"results": []}
+        results = await asyncio.to_thread((await get_search_index()).search, query, limit)
+        if is_htmx:
+            return HTMLResponse(render_search_results_fragment(results, query))
+        return {"results": [result.to_payload() for result in results]}
 
     if dev_reload:
 

@@ -76,6 +76,348 @@ body {
   min-height: 100vh;
 }
 
+/* ── Search: trigger button ───────────────────────────── */
+
+.search-trigger {
+  position: fixed;
+  top: 0.75rem;
+  right: 1rem;
+  z-index: 20;
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  padding: 3px;
+  border: 1px solid transparent;
+  border-radius: 0.55rem;
+  background: var(--panel);
+  color: var(--muted);
+  cursor: pointer;
+  opacity: 0.5;
+  transition: opacity 0.25s, gap 0.3s, border-color 0.25s;
+}
+
+.search-trigger:hover {
+  opacity: 1;
+  gap: 2px;
+  border-color: var(--panel-border);
+}
+
+.search-trigger:focus-visible,
+.search-close:focus-visible,
+.search-result:focus-visible,
+.search-input:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 2px;
+}
+
+.search-trigger-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 26px;
+}
+
+.search-trigger-label {
+  display: none;
+}
+
+.search-trigger-shortcut {
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 0.7rem;
+  line-height: 1;
+  color: var(--muted);
+  padding: 0;
+  transition: max-width 0.3s cubic-bezier(0.08, 0.82, 0.18, 1), opacity 0.2s, padding 0.3s;
+}
+
+.search-trigger:hover .search-trigger-shortcut {
+  max-width: 3rem;
+  opacity: 1;
+  padding: 0 0.3rem 0 0.1rem;
+}
+
+/* ── Search: dialog + backdrop ────────────────────────── */
+
+.search-dialog {
+  padding: 0;
+  border: 1px solid var(--panel-border);
+  border-radius: 1rem;
+  width: min(680px, calc(100% - 2rem));
+  max-height: min(72vh, 760px);
+  margin-top: min(12vh, 6rem);
+  background: var(--bg);
+  color: var(--text);
+  box-shadow: 0 24px 48px rgb(0 0 0 / 18%), 0 0 0 1px rgb(0 0 0 / 5%);
+  overflow: hidden;
+
+}
+
+.search-dialog[open] {
+  view-transition-name: search-dialog;
+}
+
+html.theme-view-transition .search-dialog[open] {
+  view-transition-name: none;
+}
+
+.search-dialog::backdrop {
+  background: rgb(0 0 0 / 28%);
+}
+
+/* ── View Transition: dialog open/close + theme swap ─── */
+
+/* Root group: clean backdrop crossfade */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.18s;
+  animation-timing-function: ease-out;
+}
+
+html.theme-view-transition::view-transition-old(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+html.theme-view-transition.theme-view-to-light::view-transition-new(root) {
+  animation: theme-fade-in 0.62s cubic-bezier(0.25, 0.1, 0.25, 1) both;
+  mix-blend-mode: normal;
+}
+
+html.theme-view-transition.theme-view-to-dark::view-transition-new(root) {
+  animation: theme-fade-in 0.56s cubic-bezier(0.4, 0.1, 0.2, 1) both;
+  mix-blend-mode: normal;
+}
+
+/* Dialog entering — smooth glide down */
+::view-transition-new(search-dialog):only-child {
+  animation: search-in 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Dialog exiting — quick fade up */
+::view-transition-old(search-dialog):only-child {
+  animation: search-out 0.12s ease-out both;
+}
+
+@keyframes theme-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes search-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes search-out {
+  to {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+}
+
+/* ── Search: modal layout ─────────────────────────────── */
+
+.search-modal {
+  display: flex;
+  flex-direction: column;
+  max-height: min(72vh, 760px);
+}
+
+.search-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--panel-border);
+  background: var(--panel);
+}
+
+.search-input-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--muted);
+  transition: opacity 0.15s;
+}
+
+.search-modal-header:has(.htmx-request) .search-input-icon {
+  opacity: 0.3;
+  transition: opacity 0.4s 0.35s;
+}
+
+.search-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 1rem;
+}
+
+.search-input::placeholder {
+  color: var(--muted);
+}
+
+.search-input:focus {
+  outline: none;
+}
+
+.search-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-width: 2.25rem;
+  padding: 0.32rem 0.5rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 0.5rem;
+  background: var(--bg);
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.search-close:hover {
+  border-color: var(--muted);
+}
+
+/* ── Search: results ──────────────────────────────────── */
+
+.search-modal-body {
+  flex: 1;
+  min-height: 0;
+  padding: 0.45rem;
+  overflow-y: auto;
+}
+
+.search-state {
+  margin: 0;
+  padding: 0.85rem 0.9rem;
+  color: var(--muted);
+  font-size: 0.94rem;
+}
+
+.search-results {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.search-result {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.4rem 0.75rem;
+  border: none;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+/* Auto-highlight first result when no keyboard selection exists */
+.search-results:not(:has(.is-active)) .search-result:first-child,
+.search-result.is-active {
+  background: var(--active-bg);
+}
+
+.search-result:hover {
+  background: var(--active-bg);
+}
+
+.search-result-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.search-result-title {
+  min-width: 0;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-result-path {
+  flex-shrink: 0;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+
+.search-result-snippet {
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ── Search: footer ───────────────────────────────────── */
+
+.search-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.65rem 1rem;
+  border-top: 1px solid var(--panel-border);
+  color: var(--muted);
+  background: var(--panel);
+  font-size: 0.78rem;
+}
+
+.search-footer-copy {
+  min-width: 0;
+}
+
+.search-footer-hints {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  white-space: nowrap;
+}
+
+.search-dialog kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.5rem;
+  padding: 0.14rem 0.36rem;
+  border: 1px solid var(--panel-border);
+  border-bottom-width: 2px;
+  border-radius: 0.38rem;
+  background: var(--bg);
+  color: var(--text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 0.76rem;
+}
+
 .markdown-body :is(h1, h2, h3, h4, h5, h6) {
   scroll-margin-top: 1rem;
 }
@@ -714,7 +1056,9 @@ a.sidebar-title:hover {
 
 @media (width <= 767px) {
   .content-header,
-  .empty-state-header {
+  .empty-state-header,
+  .search-modal-footer,
+  .search-result-header {
     align-items: flex-start;
     flex-direction: column;
   }
@@ -725,5 +1069,20 @@ a.sidebar-title:hover {
 
   .markdown-body {
     padding: 1rem 1rem 2rem;
+  }
+
+  .search-trigger {
+    top: 0.6rem;
+    right: 0.75rem;
+  }
+
+  .search-dialog {
+    margin-top: 0.75rem;
+    width: calc(100% - 1rem);
+    max-height: 85vh;
+  }
+
+  .search-result-path {
+    max-width: 100%;
   }
 }
