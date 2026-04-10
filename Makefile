@@ -14,6 +14,13 @@ install-python: .uv ## Install development and lint dependencies
 .PHONY: install
 install: install-python ## Install local development dependencies
 
+.PHONY: install-all-python
+install-all-python: .uv ## Install and sync an environment for every supported Python version
+	UV_PROJECT_ENVIRONMENT=.venv311 uv sync --python 3.11 --frozen
+	UV_PROJECT_ENVIRONMENT=.venv312 uv sync --python 3.12 --frozen
+	UV_PROJECT_ENVIRONMENT=.venv313 uv sync --python 3.13 --frozen
+	UV_PROJECT_ENVIRONMENT=.venv314 uv sync --python 3.14 --frozen
+
 .PHONY: setup
 setup: install ## Backward-compatible alias for install
 
@@ -23,7 +30,7 @@ sync: .uv ## Update local packages and uv.lock
 
 .PHONY: clean
 clean: ## Remove generated build and tool artifacts
-	rm -rf .coverage .mypy_cache .pytest_cache .ruff_cache .pyright dist build htmlcov
+	rm -rf .coverage .mypy_cache .pytest_cache .ruff_cache .pyright dist build htmlcov .venv311 .venv312 .venv313 .venv314
 
 .PHONY: format-python
 format-python: ## Format Python code
@@ -64,8 +71,16 @@ typecheck-mypy: ## Run static type checking with Mypy
 typecheck: typecheck-pyright typecheck-mypy ## Run static type checking
 
 .PHONY: test
-test: ## Run the test suite
-	COLUMNS=120 uv run pytest
+test: ## Run tests (set PYTEST_PYTHON=3.14 to choose an interpreter)
+	@# To test using a specific Python version, run 'make install-all-python' then set PYTEST_PYTHON=3.11 or similar
+	COLUMNS=120 $(if $(PYTEST_PYTHON),UV_PROJECT_ENVIRONMENT=.venv$(subst .,,$(PYTEST_PYTHON))) uv run $(if $(PYTEST_PYTHON),--python $(PYTEST_PYTHON)) pytest
+
+.PHONY: test-all-python
+test-all-python: ## Run tests on Python 3.11 to 3.14
+	COLUMNS=120 UV_PROJECT_ENVIRONMENT=.venv311 uv run --python 3.11 pytest
+	COLUMNS=120 UV_PROJECT_ENVIRONMENT=.venv312 uv run --python 3.12 pytest
+	COLUMNS=120 UV_PROJECT_ENVIRONMENT=.venv313 uv run --python 3.13 pytest
+	COLUMNS=120 UV_PROJECT_ENVIRONMENT=.venv314 uv run --python 3.14 pytest
 
 .PHONY: all
 all: format lint typecheck test ## Run the standard local development checks
