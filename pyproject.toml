@@ -1,6 +1,6 @@
 [project]
 name = "markserv"
-version = "1.0.0"
+version = "1.1.0"
 description = "Live-render GitHub-flavored markdown files and folders"
 readme = "README.md"
 authors = [{ name = "Nathan Gage", email = "nathan@sweetspot.so" }]
@@ -11,14 +11,23 @@ dependencies = [
   "fasthx[htmy]>=3.1.0",
   "fastapi>=0.115.12",
   "ignoretree>=0.2.0",
+  "pygments>=2.19.2",
   "rich>=14.0.0",
   "uvicorn>=0.34.0",
   "watchfiles>=1.0.5",
+  "pyyaml>=6.0.3",
 ]
 
 [dependency-groups]
 dev = ["httpx>=0.28.1", "pytest>=8.4.0", "yamlfix>=1.19.1"]
-lint = ["mypy>=1.15.0", "pyright>=1.1.408", "ruff>=0.14.0", "taplo>=0.9.3"]
+lint = [
+  "mypy>=1.15.0",
+  "pyright>=1.1.408",
+  "ruff>=0.14.0",
+  "taplo>=0.9.3",
+  "types-pygments>=2.20.0.20260408",
+  "types-pyyaml>=6.0.12.20260408",
+]
 
 [project.scripts]
 markserv = "markserv.cli:main"

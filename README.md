@@ -58,11 +58,36 @@ markserv.demo --no-open --port 9001
 ## Behavior
 
 - Renders common markdown extensions like `.md` and `.markdown`
+- Adds heading anchors automatically for easy deep-linking
+- Syntax-highlights fenced code blocks
 - Watches markdown files and reloads the browser when content changes
 - Respects `.gitignore` while scanning so ignored trees like `.venv/` are skipped
-- Serves linked local assets like images from the same file tree
+- Serves linked local assets from the same file tree with safer defaults for hidden, executable, and sensitive files
 - In directory mode, shows a sidebar for browsing multiple markdown pages
+- Supports YAML front matter for page titles and navigation labels/order
 - Includes a system/light/dark theme control that remembers your choice in browser storage
+
+## Front matter
+
+`markserv` supports YAML front matter for navigation metadata:
+
+```md
+---
+title: Overview
+nav_label: Start Here
+nav_order: 10
+hidden: false
+---
+
+# Overview
+```
+
+Supported top-level keys:
+
+- `title`: browser/page title fallback
+- `nav_label`: sidebar label override
+- `nav_order`: numeric sort order in the sidebar
+- `hidden`: hide the page from sidebar navigation while keeping it routable
 
 ## Development
 
