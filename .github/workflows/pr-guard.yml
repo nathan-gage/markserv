@@ -1,0 +1,66 @@
+name: PR Guard
+
+on:
+  pull_request_target:
+    types:
+      - opened
+      - edited
+      - reopened
+      - synchronize
+      - labeled
+      - unlabeled
+      - ready_for_review
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  pr-guard:
+    name: PR metadata
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate PR title and release label
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request
+
+            if (pr.draft) {
+              core.notice('Draft pull request: skipping metadata enforcement until ready for review.')
+              return
+            }
+
+            const allowedLabels = ['enhancement', 'bug', 'documentation']
+            const labelNames = pr.labels.map((label) => label.name)
+            const matchedLabels = labelNames.filter((label) => allowedLabels.includes(label))
+            const errors = []
+
+            if (matchedLabels.length !== 1) {
+              errors.push(
+                `Expected exactly one release label from ${allowedLabels.join(', ')}; found ${matchedLabels.length}: ${matchedLabels.join(', ') || '(none)'}.`,
+              )
+            }
+
+            const title = (pr.title || '').trim()
+            if (!title) {
+              errors.push('PR title must not be empty.')
+            }
+
+            const discouragedTitlePatterns = [
+              /^wip\b/i,
+              /^(fix|bugfix|update|changes|misc|cleanup|docs?|documentation|refactor|test|tests)$/i,
+            ]
+
+            if (discouragedTitlePatterns.some((pattern) => pattern.test(title))) {
+              errors.push(
+                `PR title "${title}" is too generic. Use a changelog-ready title like "Fix live reload for single-file mode".`,
+              )
+            }
+
+            if (errors.length > 0) {
+              core.setFailed(errors.join('\n'))
+            } else {
+              core.notice(`PR metadata looks good. Release label: ${matchedLabels[0]}.`)
+            }
