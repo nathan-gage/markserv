@@ -432,6 +432,20 @@ a.sidebar-title:hover {
   padding: 0 0.3rem 0 0.15rem;
 }
 
+.floating-theme-picker::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 150px;
+  pointer-events: auto;
+}
+
+.floating-theme-picker:hover::after {
+  display: none;
+}
+
 .sidebar-toggle {
   position: fixed;
   top: 0.75rem;
