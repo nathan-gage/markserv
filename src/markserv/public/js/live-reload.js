@@ -1,13 +1,20 @@
 (() => {
+  const PAGE_SHELL = "#page-shell";
+
   let source = null;
   let reloadRequest = null;
 
-  function currentLiveFragmentHref() {
-    const shell = document.getElementById("page-shell");
-    if (!(shell instanceof HTMLElement)) return null;
+  function isPageShellTarget(target) {
+    return target instanceof Element && target.matches(PAGE_SHELL);
+  }
 
-    const href = shell.dataset.liveFragment;
-    return href || null;
+  function currentPageHref() {
+    if (!(document.getElementById("page-shell") instanceof HTMLElement)) {
+      return null;
+    }
+
+    const { pathname, search } = window.location;
+    return `${pathname}${search}`;
   }
 
   function closeSource() {
@@ -17,7 +24,7 @@
   }
 
   function syncSource() {
-    if (!currentLiveFragmentHref()) {
+    if (!currentPageHref()) {
       closeSource();
       return;
     }
@@ -34,12 +41,12 @@
   }
 
   function requestReload() {
-    const liveFragmentHref = currentLiveFragmentHref();
-    if (!liveFragmentHref || reloadRequest || !window.htmx) {
+    const pageHref = currentPageHref();
+    if (!pageHref || reloadRequest || !window.htmx) {
       return;
     }
 
-    reloadRequest = window.htmx.ajax("GET", liveFragmentHref, {
+    reloadRequest = window.htmx.ajax("GET", pageHref, {
       target: "#page-shell",
       swap: "outerHTML",
     });
@@ -62,7 +69,11 @@
     syncSource();
   }
 
-  document.addEventListener("htmx:afterSwap", syncSource);
+  document.addEventListener("htmx:afterSwap", (event) => {
+    if (isPageShellTarget(event.target)) {
+      syncSource();
+    }
+  });
   window.addEventListener("pagehide", closeSource);
   window.addEventListener("beforeunload", closeSource);
 })();

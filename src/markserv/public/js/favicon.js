@@ -1,4 +1,10 @@
 (() => {
+  const PAGE_SHELL = "#page-shell";
+
+  function isPageShellTarget(target) {
+    return target instanceof Element && target.matches(PAGE_SHELL);
+  }
+
   function updateFavicon() {
     const shell = document.getElementById("page-shell");
     if (!shell) return;
@@ -18,7 +24,11 @@
   }
 
   // After HTMX swaps in new content, update the favicon
-  document.addEventListener("htmx:afterSwap", updateFavicon);
+  document.addEventListener("htmx:afterSwap", (event) => {
+    if (isPageShellTarget(event.target)) {
+      updateFavicon();
+    }
+  });
 
   // Also run on initial load in case the icon hasn't loaded yet
   if (document.readyState === "loading") {

@@ -1,5 +1,6 @@
 (() => {
   const WIDTH_KEY = "markserv-sidebar-width";
+  const PAGE_SHELL = "#page-shell";
   const COLLAPSED_KEY = "markserv-sidebar-collapsed";
   const MIN_WIDTH = 180;
   const MAX_WIDTH = 500;
@@ -7,6 +8,10 @@
   const ANIMATION_MS = 380;
 
   let animationTimer = null;
+
+  function isPageShellTarget(target) {
+    return target instanceof Element && target.matches(PAGE_SHELL);
+  }
 
   function storedWidth() {
     try {
@@ -54,7 +59,11 @@
   applySidebarState();
 
   document.addEventListener("DOMContentLoaded", applySidebarState);
-  document.addEventListener("htmx:afterSwap", applySidebarState);
+  document.addEventListener("htmx:afterSwap", (event) => {
+    if (isPageShellTarget(event.target)) {
+      applySidebarState();
+    }
+  });
 
   // Collapse toggle — CSS transitions handle the animation.
   document.addEventListener("click", (e) => {
