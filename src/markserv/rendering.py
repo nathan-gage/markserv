@@ -32,14 +32,12 @@ class DocsPageView:
     root_dir: str
     home_href: str | None
     nav_items: tuple[NavNode, ...]
-    live_fragment_href: str | None
     dev_reload: bool = False
 
 
 @dataclass(frozen=True)
 class EmptyPageView:
     root_dir: str
-    live_fragment_href: str | None
     dev_reload: bool = False
 
 
@@ -63,17 +61,8 @@ def icon_href(rel_path: str) -> str:
     return f"/icons/docs/{quote(rel_path, safe='/')}"
 
 
-def docs_fragment_href(rel_path: str) -> str:
-    return f"/_live/docs/{quote(rel_path, safe='/')}"
-
-
-def root_fragment_href() -> str:
-    return "/_live/root"
-
-
 def build_empty_view(site: SiteSource, *, dev_reload: bool = False) -> EmptyPageView:
-    live_fragment_href = root_fragment_href() if site.watch_root is not None and site.watch_filter is not None else None
-    return EmptyPageView(root_dir=site.root_label, live_fragment_href=live_fragment_href, dev_reload=dev_reload)
+    return EmptyPageView(root_dir=site.root_label, dev_reload=dev_reload)
 
 
 def build_docs_view(
@@ -90,10 +79,6 @@ def build_docs_view(
     nav_items = page_index.nav_items(rel_path)
     with_sidebar = site.show_navigation and bool(nav_items)
 
-    live_fragment_href = None
-    if site.watch_root is not None and site.watch_filter is not None:
-        live_fragment_href = docs_fragment_href(rel_path)
-
     rendered_markdown = _enhance_markdown_links(render_markdown(markdown_text), rel_path)
 
     return DocsPageView(
@@ -105,7 +90,6 @@ def build_docs_view(
         root_dir=site.root_label,
         home_href=None if home_doc is None else docs_href(home_doc),
         nav_items=nav_items,
-        live_fragment_href=live_fragment_href,
         dev_reload=dev_reload,
     )
 
@@ -136,30 +120,30 @@ def _flatten_nav(items: tuple[NavNode, ...]) -> list[NavFile]:
     return result
 
 
-def _live_fragment_href_for_docs_href(href: str) -> str | None:
-    prefix = "/docs/"
-    if not href.startswith(prefix):
-        return None
-    return f"/_live/docs/{href.removeprefix(prefix)}"
-
-
-def _live_nav_attrs(href: str) -> dict[str, str]:
+def _htmx_request_href(href: str) -> str | None:
     split = urlsplit(href)
-    live_href = _live_fragment_href_for_docs_href(split.path)
-    if live_href is None:
-        return {}
+    if not split.path.startswith("/docs/"):
+        return None
+    request_href = split.path
     if split.query:
-        live_href = f"{live_href}?{split.query}"
+        request_href = f"{request_href}?{split.query}"
+    return request_href
+
+
+def _htmx_nav_attrs(href: str) -> dict[str, str]:
+    request_href = _htmx_request_href(href)
+    if request_href is None:
+        return {}
     return {
-        "hx_get": live_href,
+        "hx_get": request_href,
         "hx_target": "#page-shell",
         "hx_swap": "outerHTML",
         "hx_push_url": href,
     }
 
 
-def _live_nav_html_attrs(href: str) -> str:
-    attrs = _live_nav_attrs(href)
+def _htmx_nav_html_attrs(href: str) -> str:
+    attrs = _htmx_nav_attrs(href)
     return "".join(f' {name.replace("_", "-")}="{_html_escape(value, quote=True)}"' for name, value in attrs.items())
 
 
@@ -203,14 +187,14 @@ def _enhance_markdown_links(rendered_html: str, current_rel_path: str) -> str:
             attrs,
             count=1,
         )
-        return f"<a{updated_attrs}{_live_nav_html_attrs(docs_target_href)}>"
+        return f"<a{updated_attrs}{_htmx_nav_html_attrs(docs_target_href)}>"
 
     return ANCHOR_TAG_RE.sub(replace, rendered_html)
 
 
 def _nav_link(nav_file: NavFile) -> ComponentType:
     cls = "nav-link is-active" if nav_file.active else "nav-link"
-    return html.a(nav_file.label, href=nav_file.href, class_=cls, **_live_nav_attrs(nav_file.href))
+    return html.a(nav_file.label, href=nav_file.href, class_=cls, **_htmx_nav_attrs(nav_file.href))
 
 
 def _render_section_children(children: tuple[NavNode, ...], group: list[ComponentType]) -> None:
@@ -363,7 +347,7 @@ def docs_shell(view: DocsPageView) -> ComponentType:
         title: ComponentType
         if view.home_href is not None:
             title = html.a(
-                view.config_name, href=view.home_href, class_="sidebar-title", **_live_nav_attrs(view.home_href)
+                view.config_name, href=view.home_href, class_="sidebar-title", **_htmx_nav_attrs(view.home_href)
             )
         else:
             title = html.span(view.config_name, class_="sidebar-title")
@@ -429,7 +413,6 @@ def docs_shell(view: DocsPageView) -> ComponentType:
         id="page-shell",
         class_=shell_class,
         data_icon=icon_href(view.rel_path),
-        data_live_fragment=view.live_fragment_href,
         hx_history_elt="",
     )
 
@@ -458,7 +441,6 @@ def empty_shell(view: EmptyPageView) -> ComponentType:
         ),
         id="page-shell",
         class_="empty-state",
-        data_live_fragment=view.live_fragment_href,
         hx_history_elt="",
     )
 
@@ -550,7 +532,7 @@ def render_search_results_fragment(results: Sequence[SearchResult], query: str) 
         if r.snippet:
             snippet = f'<span class="search-result-snippet">{_html_escape(r.snippet)}</span>'
         parts.append(
-            f'<a href="{_html_escape(r.href)}" class="search-result"{_live_nav_html_attrs(r.href)}>'
+            f'<a href="{_html_escape(r.href)}" class="search-result"{_htmx_nav_html_attrs(r.href)}>'
             f'<span class="search-result-header">'
             f'<span class="search-result-title">{_html_escape(r.title)}</span>'
             f'<span class="search-result-path">{_html_escape(r.rel_path)}</span>'
@@ -574,6 +556,7 @@ def base_document(
             html.head(
                 html.Meta.charset(),
                 html.Meta.viewport(),
+                html.meta(name="htmx-config", content='{"historyRestoreAsHxRequest":false}'),
                 html.title(title),
                 favicon,
                 html.link(

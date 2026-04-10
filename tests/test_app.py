@@ -95,7 +95,7 @@ def test_page_index_is_cached_across_requests() -> None:
         page_response = client.get("/docs/README.md")
         assert page_response.status_code == 200
 
-        fragment_response = client.get("/_live/docs/README.md", headers={"HX-Request": "true"})
+        fragment_response = client.get("/docs/README.md", headers={"HX-Request": "true"})
         assert fragment_response.status_code == 200
 
     assert site.page_index_calls == 1
@@ -136,15 +136,16 @@ def test_directory_mode_redirects_to_readme_and_hides_gitignored_files(tmp_path:
         assert "hit-area-2" in page_response.text
         assert "hit-area-x-2" in page_response.text
         assert "/public/vendor/htmx.min.js" in page_response.text
-        assert 'data-live-fragment="/_live/docs/README.md"' in page_response.text
+        assert 'name="htmx-config"' in page_response.text
+        assert "historyRestoreAsHxRequest" in page_response.text
         assert 'hx-history-elt=""' in page_response.text
         assert 'sse-connect="/_events"' not in page_response.text
-        assert 'hx-get="/_live/docs/guide.md"' in page_response.text
+        assert 'hx-get="/docs/guide.md"' in page_response.text
         assert 'hx-push-url="/docs/guide.md"' in page_response.text
         assert 'href="/docs/guide.md"' in page_response.text
         assert "guide" in page_response.text
 
-        fragment_response = client.get("/_live/docs/README.md", headers={"HX-Request": "true"})
+        fragment_response = client.get("/docs/README.md", headers={"HX-Request": "true"})
         assert fragment_response.status_code == 200
         assert 'id="page-shell"' in fragment_response.text
         assert 'hx-swap-oob="true"' in fragment_response.text
@@ -171,8 +172,8 @@ def test_htmx_redirects_use_hx_location_for_shell_swaps(tmp_path: Path) -> None:
     write_text(docs_root / "guides" / "README.md", "# Guides\n")
 
     with TestClient(create_app(build_config(docs_root))) as client:
-        root_fragment = client.get("/_live/root", headers={"HX-Request": "true"})
-        section_fragment = client.get("/_live/docs/guides", headers={"HX-Request": "true"})
+        root_fragment = client.get("/", headers={"HX-Request": "true"})
+        section_fragment = client.get("/docs/guides", headers={"HX-Request": "true"})
 
     assert root_fragment.status_code == 204
     root_location = json.loads(root_fragment.headers["HX-Location"])
@@ -207,11 +208,11 @@ def test_markdown_doc_links_are_htmx_enhanced_without_touching_assets(tmp_path: 
 
     assert response.status_code == 200
     assert (
-        '<a href="/docs/guide.md" hx-get="/_live/docs/guide.md" hx-target="#page-shell" hx-swap="outerHTML" hx-push-url="/docs/guide.md">Guide</a>'
+        '<a href="/docs/guide.md" hx-get="/docs/guide.md" hx-target="#page-shell" hx-swap="outerHTML" hx-push-url="/docs/guide.md">Guide</a>'
         in response.text
     )
     assert (
-        '<a href="/docs/guide.md#details" hx-get="/_live/docs/guide.md" hx-target="#page-shell" hx-swap="outerHTML" hx-push-url="/docs/guide.md#details">Deep guide</a>'
+        '<a href="/docs/guide.md#details" hx-get="/docs/guide.md" hx-target="#page-shell" hx-swap="outerHTML" hx-push-url="/docs/guide.md#details">Deep guide</a>'
         in response.text
     )
     assert '<a href="diagram.png">Diagram</a>' in response.text

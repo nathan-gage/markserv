@@ -40,7 +40,7 @@ def test_search_result_links_are_htmx_enhanced(tmp_path: Path) -> None:
 
     assert response.status_code == 200
     assert 'class="search-result"' in response.text
-    assert 'hx-get="/_live/docs/guide.md"' in response.text
+    assert 'hx-get="/docs/guide.md"' in response.text
     assert 'hx-target="#page-shell"' in response.text
     assert 'hx-swap="outerHTML"' in response.text
     assert 'hx-push-url="/docs/guide.md"' in response.text

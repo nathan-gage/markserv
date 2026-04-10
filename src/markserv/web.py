@@ -7,11 +7,12 @@ import mimetypes
 import os
 from collections.abc import AsyncIterator, Awaitable, Callable
 from pathlib import Path
+from typing import TypeVar
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi import Response as FastAPIResponse
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response, StreamingResponse
 from fasthx.htmy import HTMY
+from htmy import Component
 from watchfiles import awatch
 
 from .icons import generate_favicon
@@ -45,6 +46,7 @@ PACKAGE_DIR = Path(__file__).resolve().parent
 PUBLIC_DIR = PACKAGE_DIR / "public"
 PYTHON_RELOAD_ENV_VAR = "MARKSERV_PYTHON_RELOAD"
 DEV_RELOAD_ASSET_EXTENSIONS = {".css", ".js"}
+V = TypeVar("V", DocsPageView, EmptyPageView)
 
 
 class ReloadBroker:
@@ -383,49 +385,53 @@ def create_app(config_or_site: ServeConfig | SiteSource) -> FastAPI:
                 },
             )
 
+    def is_htmx_request(request: Request) -> bool:
+        return request.headers.get("hx-request") == "true"
+
+    async def render_view_response(
+        request: Request,
+        view: V,
+        *,
+        page_renderer: Callable[[V], Component],
+        fragment_renderer: Callable[[V], Component],
+    ) -> HTMLResponse:
+        component = fragment_renderer(view) if is_htmx_request(request) else page_renderer(view)
+        return HTMLResponse(await htmy.render_component(component, request), headers=NO_CACHE_HEADERS)
+
     @app.get("/", response_model=None)
     @app.get("/docs", response_model=None)
-    @htmy.page(render_empty_page)
-    async def root(response: FastAPIResponse) -> Response | EmptyPageView:
-        response.headers.update(NO_CACHE_HEADERS)
+    async def root(request: Request) -> Response:
         if site.default_doc is not None:
-            return redirect_response(docs_href(site.default_doc))
+            return redirect_response(docs_href(site.default_doc), htmx=is_htmx_request(request))
 
         home_doc = (await get_page_index()).choose_default_doc()
         if home_doc is not None:
-            return redirect_response(docs_href(home_doc))
+            return redirect_response(docs_href(home_doc), htmx=is_htmx_request(request))
 
-        return build_empty_view(site, dev_reload=dev_reload)
-
-    @app.get("/_live/root", response_model=None)
-    @htmy.hx(render_empty_fragment, no_data=True)
-    async def root_fragment(response: FastAPIResponse) -> Response | EmptyPageView:
-        response.headers.update(NO_CACHE_HEADERS)
-        if site.default_doc is not None:
-            return redirect_response(docs_href(site.default_doc), htmx=True)
-
-        home_doc = (await get_page_index()).choose_default_doc()
-        if home_doc is not None:
-            return redirect_response(docs_href(home_doc), htmx=True)
-
-        return build_empty_view(site, dev_reload=dev_reload)
+        return await render_view_response(
+            request,
+            build_empty_view(site, dev_reload=dev_reload),
+            page_renderer=render_empty_page,
+            fragment_renderer=render_empty_fragment,
+        )
 
     @app.get("/docs/{requested_path:path}", response_model=None)
-    @htmy.page(render_docs_page)
-    async def docs(requested_path: str, response: FastAPIResponse) -> Response | DocsPageView:
-        response.headers.update(NO_CACHE_HEADERS)
-        return await resolve_docs_response(site, await get_page_index(), requested_path, dev_reload=dev_reload)
-
-    @app.get("/_live/docs/{requested_path:path}", response_model=None)
-    @htmy.hx(render_docs_fragment, no_data=True)
-    async def docs_fragment(requested_path: str, response: FastAPIResponse) -> Response | DocsPageView:
-        response.headers.update(NO_CACHE_HEADERS)
-        return await resolve_docs_response(
+    async def docs(request: Request, requested_path: str) -> Response:
+        resolved = await resolve_docs_response(
             site,
             await get_page_index(),
             requested_path,
-            htmx=True,
+            htmx=is_htmx_request(request),
             dev_reload=dev_reload,
+        )
+        if isinstance(resolved, Response):
+            return resolved
+
+        return await render_view_response(
+            request,
+            resolved,
+            page_renderer=render_docs_page,
+            fragment_renderer=render_docs_fragment,
         )
 
     return app
