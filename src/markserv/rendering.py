@@ -24,13 +24,13 @@ class DocsPageView:
     root_dir: str
     home_href: str | None
     nav_items: tuple[NavNode, ...]
-    live_fragment_href: str
+    live_fragment_href: str | None
 
 
 @dataclass(frozen=True)
 class EmptyPageView:
     root_dir: str
-    live_fragment_href: str
+    live_fragment_href: str | None
 
 
 def extract_title(markdown_text: str, fallback: str) -> str:
@@ -66,13 +66,18 @@ def root_fragment_href() -> str:
 
 
 def build_empty_view(site: SiteSource) -> EmptyPageView:
-    return EmptyPageView(root_dir=site.root_label, live_fragment_href=root_fragment_href())
+    live_fragment_href = root_fragment_href() if site.watch_root is not None and site.watch_filter is not None else None
+    return EmptyPageView(root_dir=site.root_label, live_fragment_href=live_fragment_href)
 
 
 def build_docs_view(site: SiteSource, page_index: PageIndex, rel_path: str, markdown_text: str) -> DocsPageView:
     title = extract_title(markdown_text, fallback=humanize_name(rel_path.rsplit("/", 1)[-1].rsplit(".", 1)[0]))
     home_doc = page_index.choose_default_doc(preferred=site.default_doc)
     with_sidebar = site.show_navigation and bool(page_index.pages)
+
+    live_fragment_href = None
+    if site.watch_root is not None and site.watch_filter is not None:
+        live_fragment_href = docs_fragment_href(rel_path)
 
     return DocsPageView(
         title=title,
@@ -83,11 +88,14 @@ def build_docs_view(site: SiteSource, page_index: PageIndex, rel_path: str, mark
         root_dir=site.root_label,
         home_href=None if home_doc is None else docs_href(home_doc),
         nav_items=page_index.nav_items(rel_path),
-        live_fragment_href=docs_fragment_href(rel_path),
+        live_fragment_href=live_fragment_href,
     )
 
 
-def sse_reload_listener(live_fragment_href: str) -> ComponentType:
+def sse_reload_listener(live_fragment_href: str | None) -> ComponentType:
+    if live_fragment_href is None:
+        return Fragment()
+
     return html.div(
         html.div(
             hx_get=live_fragment_href,

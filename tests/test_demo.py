@@ -29,6 +29,8 @@ def test_demo_site_renders_without_filesystem_fixture() -> None:
         assert page_response.status_code == 200
         assert "GitHub-flavored markdown examples · markserv" in page_response.text
         assert 'data-theme-btn="system"' in page_response.text
+        assert 'hx-trigger="sse:reload"' not in page_response.text
+        assert 'sse-connect="/_events"' not in page_response.text
 
 
 def test_demo_uses_uvicorn_reload_when_env_var_set(monkeypatch: pytest.MonkeyPatch) -> None:
