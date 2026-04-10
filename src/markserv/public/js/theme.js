@@ -44,9 +44,14 @@
     darkStylesheet.media = theme === DARK_THEME ? "all" : "not all";
   }
 
+  const THEME_LABELS = { system: "System", light: "Light", dark: "Dark" };
+
   function updateThemeControls(preference) {
     document.querySelectorAll(THEME_BTN_SELECTOR).forEach((btn) => {
       btn.classList.toggle("is-active", btn.dataset.themeBtn === preference);
+    });
+    document.querySelectorAll(".theme-label").forEach((el) => {
+      el.textContent = THEME_LABELS[preference] || "";
     });
   }
 

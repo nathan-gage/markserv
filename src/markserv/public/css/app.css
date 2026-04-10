@@ -365,6 +365,57 @@ a.sidebar-title:hover {
   border: none;
 }
 
+.floating-theme-picker {
+  position: fixed;
+  bottom: 1rem;
+  left: 1rem;
+  z-index: 20;
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  padding: 3px;
+  border-radius: 0.55rem;
+  background: var(--panel);
+  border: 1px solid transparent;
+  opacity: 0.5;
+  transition: opacity 0.25s, gap 0.3s, border-color 0.25s;
+}
+
+.floating-theme-picker:hover {
+  opacity: 1;
+  gap: 2px;
+  border-color: var(--panel-border);
+}
+
+.floating-theme-picker .theme-btn:not(.is-active) {
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-width 0.3s cubic-bezier(0.08, 0.82, 0.18, 1), opacity 0.2s;
+}
+
+.floating-theme-picker:hover .theme-btn:not(.is-active) {
+  max-width: 30px;
+  opacity: 1;
+}
+
+.theme-label {
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 0.7rem;
+  color: var(--muted);
+  padding: 0;
+  transition: max-width 0.3s cubic-bezier(0.08, 0.82, 0.18, 1), opacity 0.2s, padding 0.3s;
+}
+
+.floating-theme-picker:hover .theme-label {
+  max-width: 4rem;
+  opacity: 1;
+  padding: 0 0.3rem 0 0.15rem;
+}
+
 .sidebar-toggle {
   position: fixed;
   top: 0.75rem;

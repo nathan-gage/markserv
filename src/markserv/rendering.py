@@ -218,24 +218,36 @@ _ICON_CLIPBOARD_CHECK = (
 )
 
 
+_THEME_BUTTONS = (
+    ("system", "System", _ICON_SYSTEM),
+    ("light", "Light", _ICON_SUN),
+    ("dark", "Dark", _ICON_MOON),
+)
+
+
+def _theme_buttons() -> tuple[ComponentType, ...]:
+    return tuple(
+        html.button(
+            SafeStr(icon),
+            type="button",
+            class_="theme-btn",
+            data_theme_btn=value,
+            aria_label=f"{label} theme",
+            title=label,
+        )
+        for value, label, icon in _THEME_BUTTONS
+    )
+
+
 def theme_picker() -> ComponentType:
+    return html.div(*_theme_buttons(), class_="theme-picker")
+
+
+def floating_theme_picker() -> ComponentType:
     return html.div(
-        *(
-            html.button(
-                SafeStr(icon),
-                type="button",
-                class_="theme-btn",
-                data_theme_btn=value,
-                aria_label=f"{label} theme",
-                title=label,
-            )
-            for value, label, icon in (
-                ("system", "System", _ICON_SYSTEM),
-                ("light", "Light", _ICON_SUN),
-                ("dark", "Dark", _ICON_MOON),
-            )
-        ),
-        class_="theme-picker",
+        *_theme_buttons(),
+        html.span(class_="theme-label"),
+        class_="floating-theme-picker",
     )
 
 
@@ -254,6 +266,9 @@ def _sidebar_toggle_btn() -> ComponentType:
 def docs_shell(view: DocsPageView) -> ComponentType:
     sidebar: ComponentType = Fragment()
     toggle_btn: ComponentType = Fragment()
+    theme_float: ComponentType = Fragment()
+    if not view.with_sidebar:
+        theme_float = floating_theme_picker()
     if view.with_sidebar:
         title: ComponentType
         if view.home_href is not None:
@@ -294,6 +309,7 @@ def docs_shell(view: DocsPageView) -> ComponentType:
         sse_reload_listener(view.live_fragment_href),
         toggle_btn,
         sidebar,
+        theme_float,
         html.main(
             html.div(
                 html.div(
@@ -326,9 +342,9 @@ def docs_shell(view: DocsPageView) -> ComponentType:
 def empty_shell(view: EmptyPageView) -> ComponentType:
     return html.main(
         sse_reload_listener(view.live_fragment_href),
+        floating_theme_picker(),
         html.div(
             html.h1("No markdown files found"),
-            theme_picker(),
             class_="empty-state-header",
         ),
         html.p(
