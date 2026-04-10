@@ -230,7 +230,7 @@ class SyntheticSite:
 
         self._page_index = PageIndex(
             tuple(
-                MarkdownPage(rel_path=rel_path, label=humanize_name(Path(rel_path).stem))
+                MarkdownPage(rel_path=rel_path, label=humanize_name(Path(rel_path).stem) + Path(rel_path).suffix)
                 for rel_path in sorted(self.documents, key=str.lower)
             )
         )

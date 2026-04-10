@@ -8,7 +8,7 @@ import cmarkgfm
 from cmarkgfm.cmark import Options
 from htmy import Component, ComponentType, Fragment, SafeStr, html
 
-from .site import NavDirectory, NavNode, PageIndex, SiteSource, humanize_name
+from .site import NavDirectory, NavFile, NavNode, PageIndex, SiteSource, humanize_name
 
 CMARK_OPTIONS = Options.CMARK_OPT_GITHUB_PRE_LANG | Options.CMARK_OPT_SMART
 TITLE_RE = re.compile(r"^\s{0,3}#\s+(.+?)\s*$", re.MULTILINE)
@@ -101,63 +101,112 @@ def sse_reload_listener(live_fragment_href: str) -> ComponentType:
     )
 
 
+_ICON_FOLDER = SafeStr(
+    '<svg class="nav-icon" width="14" height="14" viewBox="0 0 24 24" fill="none"'
+    ' stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9'
+    'A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>'
+)
+_ICON_FOLDER_OPEN = SafeStr(
+    '<svg class="nav-icon" width="14" height="14" viewBox="0 0 24 24" fill="none"'
+    ' stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    '<path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6'
+    "a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9"
+    'l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></svg>'
+)
+
+
+def _flatten_nav(items: tuple[NavNode, ...]) -> list[NavFile]:
+    """Recursively collect all files from a nav tree."""
+    result: list[NavFile] = []
+    for item in items:
+        if isinstance(item, NavDirectory):
+            result.extend(_flatten_nav(item.children))
+        else:
+            result.append(item)
+    return result
+
+
+def _nav_link(nav_file: NavFile) -> ComponentType:
+    cls = "nav-link is-active" if nav_file.active else "nav-link"
+    return html.a(nav_file.label, href=nav_file.href, class_=cls)
+
+
+def _render_section_children(children: tuple[NavNode, ...], group: list[ComponentType]) -> None:
+    """Render a section's children: direct files first, then sub-dirs as sub-sections."""
+    for child in children:
+        if not isinstance(child, NavDirectory):
+            group.append(_nav_link(child))
+    for child in children:
+        if isinstance(child, NavDirectory):
+            sub_icon = _ICON_FOLDER_OPEN if child.open else _ICON_FOLDER
+            sub: list[ComponentType] = [
+                html.div(sub_icon, humanize_name(child.name), class_="nav-subsection"),
+            ]
+            for f in _flatten_nav(child.children):
+                sub.append(_nav_link(f))
+            group.append(html.div(*sub, class_="nav-subgroup"))
+
+
 def render_nav_items(items: tuple[NavNode, ...]) -> ComponentType:
     if not items:
         return Fragment()
 
-    return html.ul(
-        *(
-            html.li(
-                html.details(
-                    html.summary(item.name),
-                    render_nav_items(item.children),
-                    open=True if item.open else None,
-                ),
-                class_="nav-dir",
-            )
-            if isinstance(item, NavDirectory)
-            else html.li(
-                html.a(
-                    item.label,
-                    href=item.href,
-                    class_="nav-link is-active" if item.active else "nav-link",
-                ),
-                class_="nav-file",
-            )
-            for item in items
-        ),
-        class_="nav-tree",
-    )
+    elements: list[ComponentType] = []
+    root_links = [_nav_link(item) for item in items if not isinstance(item, NavDirectory)]
+    if root_links:
+        elements.append(html.div(*root_links, class_="nav-group"))
+    for item in items:
+        if not isinstance(item, NavDirectory):
+            continue
+        icon = _ICON_FOLDER_OPEN if item.open else _ICON_FOLDER
+        group: list[ComponentType] = [
+            html.div(icon, humanize_name(item.name), class_="nav-section"),
+        ]
+        _render_section_children(item.children, group)
+        elements.append(html.div(*group, class_="nav-group"))
+
+    return html.nav(*elements, class_="nav-list")
 
 
 _ICON_SYSTEM = (
     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"'
     ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
-    '<rect x="2" y="3" width="20" height="14" rx="2"/>'
-    '<line x1="8" y1="21" x2="16" y2="21"/>'
-    '<line x1="12" y1="17" x2="12" y2="21"/></svg>'
+    '<rect width="20" height="14" x="2" y="3" rx="2"/>'
+    '<line x1="8" x2="16" y1="21" y2="21"/>'
+    '<line x1="12" x2="12" y1="17" y2="21"/></svg>'
 )
 _ICON_SUN = (
     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"'
     ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
-    '<circle cx="12" cy="12" r="5"/>'
-    '<line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>'
-    '<line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>'
-    '<line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>'
-    '<line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>'
-    '<line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>'
-    '<line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>'
+    '<circle cx="12" cy="12" r="4"/>'
+    '<path d="M12 2v2"/><path d="M12 20v2"/>'
+    '<path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/>'
+    '<path d="M2 12h2"/><path d="M20 12h2"/>'
+    '<path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>'
 )
 _ICON_MOON = (
     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"'
     ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
-    '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>'
+    '<path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803'
+    ' a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>'
+)
+_ICON_SIDEBAR_CLOSE = (
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"'
+    ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    '<rect width="18" height="18" x="3" y="3" rx="2"/>'
+    '<path d="M9 3v18"/><path d="m16 15-3-3 3-3"/></svg>'
+)
+_ICON_SIDEBAR_OPEN = (
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"'
+    ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    '<rect width="18" height="18" x="3" y="3" rx="2"/>'
+    '<path d="M9 3v18"/><path d="m14 9 3 3-3 3"/></svg>'
 )
 
 
 def theme_picker() -> ComponentType:
     return html.div(
-        html.span("Theme", class_="theme-picker-label"),
         *(
             html.button(
                 SafeStr(icon),
@@ -177,32 +226,49 @@ def theme_picker() -> ComponentType:
     )
 
 
+def _sidebar_toggle_btn() -> ComponentType:
+    return html.button(
+        html.span(SafeStr(_ICON_SIDEBAR_CLOSE), class_="sidebar-icon-close"),
+        html.span(SafeStr(_ICON_SIDEBAR_OPEN), class_="sidebar-icon-open"),
+        type="button",
+        class_="sidebar-toggle",
+        data_sidebar_toggle="",
+        aria_label="Toggle sidebar",
+        title="Toggle sidebar",
+    )
+
+
 def docs_shell(view: DocsPageView) -> ComponentType:
     sidebar: ComponentType = Fragment()
+    toggle_btn: ComponentType = Fragment()
     if view.with_sidebar:
-        home_link: ComponentType = Fragment()
+        title: ComponentType
         if view.home_href is not None:
-            home_link = html.a("Home", href=view.home_href, class_="home-link")
+            title = html.a(view.config_name, href=view.home_href, class_="sidebar-title")
+        else:
+            title = html.span(view.config_name, class_="sidebar-title")
 
+        toggle_btn = _sidebar_toggle_btn()
         sidebar = html.aside(
-            html.div(
-                html.p(view.config_name, class_="sidebar-title"),
-                html.p(f"Watching {view.root_dir}", class_="sidebar-subtitle"),
-                home_link,
-                class_="sidebar-header",
-            ),
+            html.div(title, class_="sidebar-header"),
+            html.div(view.root_dir, class_="sidebar-path"),
             render_nav_items(view.nav_items),
+            html.div(
+                theme_picker(),
+                class_="sidebar-footer",
+            ),
+            html.div(class_="sidebar-resize"),
             class_="sidebar",
         )
 
     shell_class = "app-shell with-sidebar" if view.with_sidebar else "app-shell"
     return html.div(
         sse_reload_listener(view.live_fragment_href),
+        toggle_btn,
         sidebar,
         html.main(
             html.div(
                 html.span(view.rel_path, class_="content-path"),
-                theme_picker(),
                 class_="content-header",
             ),
             html.div(
@@ -272,6 +338,7 @@ def base_document(title: str, body_content: ComponentType, favicon_href: str | N
                 ),
                 html.link(rel="stylesheet", href=public_asset_href("css/app.css")),
                 html.script(src=public_asset_href("js/theme.js")),
+                html.script(src=public_asset_href("js/sidebar.js")),
                 html.script(src=public_asset_href("js/favicon.js"), defer=True),
             ),
             html.body(
