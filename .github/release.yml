@@ -1,0 +1,22 @@
+changelog:
+  exclude:
+    labels:
+      - release:chore
+      - release:docs
+      - release:internal
+  categories:
+    - title: 🚀 Features
+      labels:
+        - release:feature
+    - title: 🐛 Fixes
+      labels:
+        - release:fix
+    - title: 💥 Breaking Changes
+      labels:
+        - release:breaking
+    - title: 📦 Dependencies
+      labels:
+        - release:dependency
+    - title: 🧰 Maintenance
+      labels:
+        - release:maintenance
