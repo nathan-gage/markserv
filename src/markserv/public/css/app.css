@@ -250,6 +250,7 @@ html.theme-view-transition.theme-view-to-dark::view-transition-new(root) {
   transition: opacity 0.15s;
 }
 
+.search-input-icon.htmx-request,
 .search-modal-header:has(.htmx-request) .search-input-icon {
   opacity: 0.3;
   transition: opacity 0.4s 0.35s;

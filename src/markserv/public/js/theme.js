@@ -1,5 +1,6 @@
 (() => {
   const STORAGE_KEY = "markserv-theme";
+  const PAGE_SHELL = "#page-shell";
   const SYSTEM_THEME = "system";
   const LIGHT_THEME = "light";
   const DARK_THEME = "dark";
@@ -13,6 +14,10 @@
 
   function isThemePreference(value) {
     return THEME_OPTIONS.includes(value);
+  }
+
+  function isPageShellTarget(target) {
+    return target instanceof Element && target.matches(PAGE_SHELL);
   }
 
   function storedThemePreference() {
@@ -95,8 +100,10 @@
     updateThemeControls(themePreference());
   });
 
-  document.addEventListener("htmx:afterSwap", () => {
-    updateThemeControls(themePreference());
+  document.addEventListener("htmx:afterSwap", (event) => {
+    if (isPageShellTarget(event.target)) {
+      updateThemeControls(themePreference());
+    }
   });
 
   let transitionTimer = null;

@@ -103,6 +103,17 @@
     });
   }
 
+  function scrollToLocationHash() {
+    const hash = window.location.hash;
+    if (!hash) return;
+
+    requestAnimationFrame(() => {
+      const id = decodeURIComponent(hash.slice(1));
+      if (!id) return;
+      document.getElementById(id)?.scrollIntoView({ block: "start" });
+    });
+  }
+
   function openSearch(d) {
     if (!d || d.open) return;
     if (pageRequestInFlight) {
@@ -293,6 +304,12 @@
     }
 
     syncLabels();
+  });
+
+  document.addEventListener("htmx:afterSettle", (e) => {
+    if (isPageShellTarget(e.target)) {
+      scrollToLocationHash();
+    }
   });
 
   window.addEventListener("pagehide", () => {

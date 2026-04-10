@@ -1,6 +1,12 @@
 (() => {
+  const PAGE_SHELL = "#page-shell";
+
   let source = null;
   let reloadRequest = null;
+
+  function isPageShellTarget(target) {
+    return target instanceof Element && target.matches(PAGE_SHELL);
+  }
 
   function currentLiveFragmentHref() {
     const shell = document.getElementById("page-shell");
@@ -62,7 +68,11 @@
     syncSource();
   }
 
-  document.addEventListener("htmx:afterSwap", syncSource);
+  document.addEventListener("htmx:afterSwap", (event) => {
+    if (isPageShellTarget(event.target)) {
+      syncSource();
+    }
+  });
   window.addEventListener("pagehide", closeSource);
   window.addEventListener("beforeunload", closeSource);
 })();

@@ -27,6 +27,23 @@ def test_search_ui_assets_are_included_in_rendered_page(tmp_path: Path) -> None:
     assert 'data-search-results=""' in response.text
     assert 'hx-trigger="input changed delay:100ms, search"' in response.text
     assert 'hx-sync="this:replace"' in response.text
+    assert 'hx-indicator=".search-input-icon"' in response.text
+
+
+def test_search_result_links_are_htmx_enhanced(tmp_path: Path) -> None:
+    docs_root = tmp_path / "docs"
+    write_text(docs_root / "README.md", "# Home\n\nSee the guide.\n")
+    write_text(docs_root / "guide.md", "# Guide\n\nThe deployment guide lives here.\n")
+
+    with TestClient(create_app(build_config(docs_root))) as client:
+        response = client.get("/_search", params={"q": "guide"}, headers={"HX-Request": "true"})
+
+    assert response.status_code == 200
+    assert 'class="search-result"' in response.text
+    assert 'hx-get="/_live/docs/guide.md"' in response.text
+    assert 'hx-target="#page-shell"' in response.text
+    assert 'hx-swap="outerHTML"' in response.text
+    assert 'hx-push-url="/docs/guide.md"' in response.text
 
 
 def test_search_endpoint_matches_titles_labels_headings_body_and_hidden_pages(tmp_path: Path) -> None:

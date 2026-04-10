@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import json
 import mimetypes
 import os
 from collections.abc import AsyncIterator, Awaitable, Callable
@@ -118,9 +119,24 @@ def asset_file_response(asset_path: Path) -> Response:
     )
 
 
+def _htmx_location_value(location: str) -> str:
+    if not location.startswith("/"):
+        return location
+    return json.dumps(
+        {
+            "path": location,
+            "target": "#page-shell",
+            "swap": "outerHTML",
+            "select": "#page-shell",
+        },
+        separators=(",", ":"),
+    )
+
+
 def redirect_response(location: str, *, htmx: bool = False) -> Response:
     if htmx:
-        return Response(status_code=204, headers={**NO_CACHE_HEADERS, "HX-Redirect": location})
+        header_name = "HX-Location" if location.startswith("/") else "HX-Redirect"
+        return Response(status_code=204, headers={**NO_CACHE_HEADERS, header_name: _htmx_location_value(location)})
     return RedirectResponse(location, status_code=307, headers=NO_CACHE_HEADERS)
 
 

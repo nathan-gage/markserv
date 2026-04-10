@@ -3,13 +3,14 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from html import escape as _html_escape
+from pathlib import Path
 from typing import TYPE_CHECKING
-from urllib.parse import quote
+from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
 
 from htmy import Component, ComponentType, Fragment, SafeStr, html
 
 from .markdown import render_markdown
-from .site import NavDirectory, NavFile, NavNode, PageIndex, SiteSource, humanize_name
+from .site import NavDirectory, NavFile, NavNode, PageIndex, SiteSource, humanize_name, is_markdown_path
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -17,6 +18,8 @@ if TYPE_CHECKING:
     from .search import SearchResult
 
 TITLE_RE = re.compile(r"^\s{0,3}#\s+(.+?)\s*$", re.MULTILINE)
+ANCHOR_TAG_RE = re.compile(r"<a(?P<attrs>\s[^>]*)>", re.IGNORECASE)
+HREF_ATTR_RE = re.compile(r'\shref="([^"]+)"')
 
 
 @dataclass(frozen=True)
@@ -91,10 +94,12 @@ def build_docs_view(
     if site.watch_root is not None and site.watch_filter is not None:
         live_fragment_href = docs_fragment_href(rel_path)
 
+    rendered_markdown = _enhance_markdown_links(render_markdown(markdown_text), rel_path)
+
     return DocsPageView(
         title=title,
         rel_path=rel_path,
-        rendered_markdown=render_markdown(markdown_text),
+        rendered_markdown=rendered_markdown,
         with_sidebar=with_sidebar,
         config_name=site.name,
         root_dir=site.root_label,
@@ -139,15 +144,68 @@ def _live_fragment_href_for_docs_href(href: str) -> str | None:
 
 
 def _live_nav_attrs(href: str) -> dict[str, str]:
-    live_href = _live_fragment_href_for_docs_href(href)
+    split = urlsplit(href)
+    live_href = _live_fragment_href_for_docs_href(split.path)
     if live_href is None:
         return {}
+    if split.query:
+        live_href = f"{live_href}?{split.query}"
     return {
         "hx_get": live_href,
         "hx_target": "#page-shell",
         "hx_swap": "outerHTML",
         "hx_push_url": href,
     }
+
+
+def _live_nav_html_attrs(href: str) -> str:
+    attrs = _live_nav_attrs(href)
+    return "".join(f' {name.replace("_", "-")}="{_html_escape(value, quote=True)}"' for name, value in attrs.items())
+
+
+def _resolve_markdown_docs_href(current_rel_path: str, href: str) -> str | None:
+    split = urlsplit(href)
+    if split.scheme or split.netloc or not split.path:
+        return None
+
+    resolved = urlsplit(urljoin(docs_href(current_rel_path), href))
+    if not resolved.path.startswith("/docs/"):
+        return None
+
+    rel_target = unquote(resolved.path.removeprefix("/docs/"))
+    if not rel_target or not is_markdown_path(Path(rel_target)):
+        return None
+
+    canonical_path = docs_href(rel_target)
+    if canonical_path == docs_href(current_rel_path):
+        return None
+
+    return urlunsplit(("", "", canonical_path, resolved.query, resolved.fragment))
+
+
+def _enhance_markdown_links(rendered_html: str, current_rel_path: str) -> str:
+    def replace(match: re.Match[str]) -> str:
+        attrs = match.group("attrs")
+        if "hx-get=" in attrs or "data-hx-get=" in attrs:
+            return match.group(0)
+
+        href_match = HREF_ATTR_RE.search(attrs)
+        if href_match is None:
+            return match.group(0)
+
+        current_href = href_match.group(1)
+        docs_target_href = _resolve_markdown_docs_href(current_rel_path, current_href)
+        if docs_target_href is None:
+            return match.group(0)
+
+        updated_attrs = HREF_ATTR_RE.sub(
+            f' href="{_html_escape(docs_target_href, quote=True)}"',
+            attrs,
+            count=1,
+        )
+        return f"<a{updated_attrs}{_live_nav_html_attrs(docs_target_href)}>"
+
+    return ANCHOR_TAG_RE.sub(replace, rendered_html)
 
 
 def _nav_link(nav_file: NavFile) -> ComponentType:
@@ -372,6 +430,7 @@ def docs_shell(view: DocsPageView) -> ComponentType:
         class_=shell_class,
         data_icon=icon_href(view.rel_path),
         data_live_fragment=view.live_fragment_href,
+        hx_history_elt="",
     )
 
 
@@ -400,6 +459,7 @@ def empty_shell(view: EmptyPageView) -> ComponentType:
         id="page-shell",
         class_="empty-state",
         data_live_fragment=view.live_fragment_href,
+        hx_history_elt="",
     )
 
 
@@ -433,6 +493,7 @@ def search_chrome() -> ComponentType:
                         hx_target="[data-search-results]",
                         hx_swap="innerHTML",
                         hx_sync="this:replace",
+                        hx_indicator=".search-input-icon",
                     ),
                     html.button(
                         "Esc",
@@ -489,7 +550,7 @@ def render_search_results_fragment(results: Sequence[SearchResult], query: str) 
         if r.snippet:
             snippet = f'<span class="search-result-snippet">{_html_escape(r.snippet)}</span>'
         parts.append(
-            f'<a href="{_html_escape(r.href)}" class="search-result">'
+            f'<a href="{_html_escape(r.href)}" class="search-result"{_live_nav_html_attrs(r.href)}>'
             f'<span class="search-result-header">'
             f'<span class="search-result-title">{_html_escape(r.title)}</span>'
             f'<span class="search-result-path">{_html_escape(r.rel_path)}</span>'
@@ -575,6 +636,7 @@ def render_empty_page(view: EmptyPageView) -> Component:
 def render_docs_fragment(view: DocsPageView) -> ComponentType:
     return Fragment(
         html.title(f"{view.title} · markserv", hx_swap_oob="true"),
+        html.link(rel="icon", type="image/png", href=icon_href(view.rel_path), id="favicon", hx_swap_oob="outerHTML"),
         docs_shell(view),
     )
 
