@@ -1,36 +1,22 @@
 ## Summary
 
 Describe the change in 2–4 sentences, focusing on user-visible behavior.
-
-## Release label
-
-Add exactly one of these GitHub labels to this PR:
-
-- `enhancement` — new behavior, improvements, refactors, maintenance, or dependency updates
-- `bug` — fixes and regressions
-- `documentation` — docs-only changes
+Delete this section if the title and diff already make the change obvious.
 
 ## Changelog note
 
 Write 1–2 sentences that could appear in the GitHub release notes.
-
-## Testing
-
-- [ ] Ran relevant local checks
-- [ ] Added or updated tests where appropriate
-- [ ] Not needed
-
-## Breaking changes
-
-- [ ] No breaking changes
-- [ ] This PR changes existing behavior and includes upgrade notes below
-
-### Upgrade notes
-
-<!-- If users need to change flags, behavior, config, or workflows, explain it here. -->
+Delete this section if the change is not user-visible.
 
 ## Checklist
 
 - [ ] PR title is user-facing and release-note quality
 - [ ] I added exactly one of: `enhancement`, `bug`, or `documentation`
+- [ ] I ran relevant local checks, or this change does not need them
+- [ ] I added or updated tests when appropriate
 - [ ] Docs updated if needed
+- [ ] No breaking changes, or I included upgrade notes below
+
+## Upgrade notes
+
+<!-- Delete this section if not needed. If users need to change flags, behavior, config, or workflows, explain it here. -->
