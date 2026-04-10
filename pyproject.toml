@@ -1,10 +1,25 @@
 [project]
 name = "markserv"
 version = "1.1.0"
-description = "Live-render GitHub-flavored markdown files and folders"
-readme = "README.md"
+description = "Preview local Markdown files and doc trees with live reload, sidebar navigation, anchors, and syntax highlighting"
+readme = { file = "README.md", content-type = "text/markdown" }
 authors = [{ name = "Nathan Gage", email = "nathan@sweetspot.so" }]
 requires-python = ">=3.11"
+keywords = ["docs", "fastapi", "gfm", "markdown", "preview", "reload"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Environment :: Web Environment",
+  "Framework :: FastAPI",
+  "Intended Audience :: Developers",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Documentation",
+  "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
+  "Topic :: Text Processing :: Markup :: HTML",
+]
 dependencies = [
   "cmarkgfm>=2024.11.20",
   "cyclopts>=4.10.1",
@@ -28,6 +43,12 @@ lint = [
   "types-pygments>=2.20.0.20260408",
   "types-pyyaml>=6.0.12.20260408",
 ]
+
+[project.urls]
+Homepage = "https://github.com/nathan-gage/markserv"
+Repository = "https://github.com/nathan-gage/markserv"
+Issues = "https://github.com/nathan-gage/markserv/issues"
+Releases = "https://github.com/nathan-gage/markserv/releases"
 
 [project.scripts]
 markserv = "markserv.cli:main"
