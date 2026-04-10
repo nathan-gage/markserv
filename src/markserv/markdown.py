@@ -30,6 +30,14 @@ NON_SLUG_RE = re.compile(r"[^\w\- ]+", re.UNICODE)
 PYGMENTS_HTML_FORMATTER = HtmlFormatter(nowrap=True)
 TRUE_VALUES = {"1", "true", "yes", "on"}
 FALSE_VALUES = {"0", "false", "no", "off"}
+ANCHOR_ICON_SVG = (
+    '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" '
+    'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" '
+    'class="anchor-icon lucide lucide-link-icon lucide-link" aria-hidden="true">'
+    '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>'
+    '<path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>'
+    "</svg>"
+)
 
 
 @dataclass(frozen=True)
@@ -191,7 +199,7 @@ def _add_heading_anchors(rendered_html: str) -> str:
         level = match.group("level")
         attrs = match.group("attrs")
         content = match.group("content")
-        if 'class="anchor"' in content:
+        if '<a class="anchor' in content:
             return match.group(0)
 
         heading_text = _heading_text(content)
@@ -200,11 +208,7 @@ def _add_heading_anchors(rendered_html: str) -> str:
         attrs_with_id = _append_class_attr(attrs_with_id, "heading-element")
         escaped_id = escape(heading_id, quote=True)
         escaped_label = escape(f"Permalink: {heading_text}", quote=True)
-        anchor = (
-            f'<a class="anchor" href="#{escaped_id}" aria-label="{escaped_label}">'
-            '<span class="octicon octicon-link"></span>'
-            "</a>"
-        )
+        anchor = f'<a class="anchor hit-area-1" href="#{escaped_id}" aria-label="{escaped_label}">{ANCHOR_ICON_SVG}</a>'
         return f"<h{level}{attrs_with_id}>{anchor}{content}</h{level}>"
 
     return HEADING_RE.sub(replace, rendered_html)

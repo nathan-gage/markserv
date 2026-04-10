@@ -14,6 +14,7 @@ def test_demo_site_contains_nested_markdown() -> None:
 
     assert "README.md" in markdown_files
     assert "guides/quickstart.md" in markdown_files
+    assert "guides/features/showcase.md" in markdown_files
     assert "guides/features/front-matter.md" in markdown_files
     assert "guides/features/gfm.md" in markdown_files
     assert "guides/nested/deep-dive.md" in markdown_files
@@ -33,6 +34,15 @@ def test_demo_site_renders_without_filesystem_fixture() -> None:
         assert ">Welcome<" in home_response.text
         assert ">Start Here<" in home_response.text
         assert ">Hidden page<" not in home_response.text
+
+        showcase_response = client.get("/docs/guides/features/showcase.md")
+        assert showcase_response.status_code == 200
+        assert "Feature showcase · markserv" in showcase_response.text
+        assert ">Feature tour<" in showcase_response.text
+        assert '<pre class="highlight" data-language="python">' in showcase_response.text
+        assert "Loaded" in showcase_response.text
+        assert "markdown pages" in showcase_response.text
+        assert 'href="../../reference/hidden-page.md"' in showcase_response.text
 
         page_response = client.get("/docs/guides/features/front-matter.md")
         assert page_response.status_code == 200
@@ -61,8 +71,9 @@ def test_demo_front_matter_controls_labels_and_ordering() -> None:
     assert hidden_page is not None and hidden_page.hidden is True
 
     with TestClient(create_app(site)) as client:
-        response = client.get("/docs/guides/features/front-matter.md")
+        response = client.get("/docs/guides/features/showcase.md")
         assert response.status_code == 200
+        assert response.text.index(">Feature tour<") < response.text.index(">Front matter<")
         assert response.text.index(">Front matter<") < response.text.index(">GFM examples<")
 
 

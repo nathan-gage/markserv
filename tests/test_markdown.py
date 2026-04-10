@@ -58,7 +58,8 @@ def test_render_markdown_adds_heading_anchors_with_unique_ids() -> None:
     assert 'href="#hello"' in rendered
     assert 'id="details-setup"' in rendered
     assert 'id="details-setup-1"' in rendered
-    assert 'class="octicon octicon-link"' in rendered
+    assert 'class="anchor hit-area-1"' in rendered
+    assert 'class="anchor-icon lucide lucide-link-icon lucide-link"' in rendered
 
 
 def test_render_markdown_syntax_highlights_fenced_code_blocks() -> None:
