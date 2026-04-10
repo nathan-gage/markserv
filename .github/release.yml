@@ -1,22 +1,17 @@
 changelog:
   exclude:
     labels:
-      - release:chore
-      - release:docs
-      - release:internal
+      - duplicate
+      - invalid
+      - question
+      - wontfix
   categories:
-    - title: 🚀 Features
+    - title: 🚀 Enhancements
       labels:
-        - release:feature
+        - enhancement
     - title: 🐛 Fixes
       labels:
-        - release:fix
-    - title: 💥 Breaking Changes
+        - bug
+    - title: 📝 Documentation
       labels:
-        - release:breaking
-    - title: 📦 Dependencies
-      labels:
-        - release:dependency
-    - title: 🧰 Maintenance
-      labels:
-        - release:maintenance
+        - documentation
