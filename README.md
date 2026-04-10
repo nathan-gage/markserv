@@ -4,16 +4,15 @@
 [![Python Versions](https://img.shields.io/pypi/pyversions/markserv.svg)](https://pypi.org/project/markserv/)
 [![CI](https://github.com/nathan-gage/markserv/actions/workflows/ci.yml/badge.svg)](https://github.com/nathan-gage/markserv/actions/workflows/ci.yml)
 
-`markserv` is a lightweight local Markdown preview server for single files and docs folders.
+`markserv` opens local Markdown files and docs folders in your browser as a lightweight live-preview web app.
 
-Point it at a README, notes directory, or docs tree and `markserv` starts a local web app, opens it in your browser automatically, and gives you a clean GitHub-style reading view with live reload, sidebar navigation, heading anchors, syntax highlighting, and theme switching.
+Point it at a README, notes directory, or docs tree and you get a clean GitHub-style reading view with live reload, sidebar navigation, heading anchors, syntax highlighting, and theme switching.
 
 ![markserv screenshot](.github/assets/readme-screenshot.png)
 
 ## Why markserv?
 
 - GitHub-flavored Markdown rendering via [`cmarkgfm`](https://github.com/theacodes/cmarkgfm)
-- Opens your preview in the browser automatically
 - Live reload while editing local docs
 - Sidebar navigation for directory-based docs
 - Automatic heading anchors for deep-linking
@@ -33,8 +32,6 @@ Point it at a README, notes directory, or docs tree and `markserv` starts a loca
 | Install a local checkout for development | `uv tool install .` |
 
 ## Quick start
-
-Each command below starts a local server and opens the preview in your browser automatically unless you pass `--no-open`.
 
 ### Serve a docs directory
 
