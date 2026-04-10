@@ -4,6 +4,12 @@
   const RESULTS = "[data-search-results]";
   const SHORTCUT = "[data-search-shortcut]";
   const RESULT = ".search-result";
+  const PAGE_SHELL = "#page-shell";
+  const EMPTY_STATE = '<p class="search-state">Start typing to search pages, headings, and content.</p>';
+
+  let pageRequestInFlight = false;
+  let pendingOpenAfterSwap = false;
+  let activeTransition = null;
 
   const isMac = /mac|iphone|ipad/i.test(
     navigator.userAgentData?.platform || navigator.platform || ""
@@ -19,19 +25,62 @@
     return document.querySelector(DIALOG);
   }
 
-  function transition(update) {
-    if (document.startViewTransition) {
-      document.startViewTransition(update);
-    } else {
+  function clearActive(container) {
+    container?.querySelectorAll(`${RESULT}.is-active`).forEach((r) => {
+      r.classList.remove("is-active");
+    });
+  }
+
+  function transition(root, update) {
+    const run =
+      typeof root?.startViewTransition === "function"
+        ? () => root.startViewTransition({ callback: update })
+        : typeof document.startViewTransition === "function"
+          ? () => document.startViewTransition(update)
+          : null;
+
+    if (!run || pageRequestInFlight || activeTransition) {
       update();
+      return null;
+    }
+
+    try {
+      const viewTransition = run();
+      if (viewTransition?.finished?.finally) {
+        activeTransition = viewTransition;
+        viewTransition.finished.finally(() => {
+          if (activeTransition === viewTransition) {
+            activeTransition = null;
+          }
+        });
+      }
+      return viewTransition;
+    } catch {
+      update();
+      return null;
     }
   }
 
-  function openSearch(d) {
-    if (!d || d.open) return;
-    transition(() => d.showModal());
+  function resetSearch(d, { clearQuery = false } = {}) {
+    if (!d) return;
+
+    const input = d.querySelector(INPUT);
+    const container = d.querySelector(RESULTS);
+
+    if (clearQuery && input) {
+      input.value = "";
+    }
+
+    clearActive(container);
+
+    if (clearQuery && container) {
+      container.innerHTML = EMPTY_STATE;
+    }
+  }
+
+  function focusSearchInput(d) {
     requestAnimationFrame(() => {
-      const input = d.querySelector(INPUT);
+      const input = d?.querySelector(INPUT);
       if (input) {
         input.focus();
         input.select();
@@ -39,9 +88,39 @@
     });
   }
 
-  function closeSearch(d) {
-    if (!d || !d.open) return;
-    transition(() => d.close());
+  function openSearch(d) {
+    if (!d || d.open) return;
+    if (pageRequestInFlight) {
+      pendingOpenAfterSwap = true;
+      return;
+    }
+    pendingOpenAfterSwap = false;
+    transition(d, () => d.showModal());
+    focusSearchInput(d);
+  }
+
+  function closeSearch(d, { clearQuery = false, animate = true } = {}) {
+    if (!d) return;
+    pendingOpenAfterSwap = false;
+    if (d.open) {
+      if (animate) transition(d, () => d.close());
+      else d.close();
+    }
+    resetSearch(d, { clearQuery });
+  }
+
+  function isModifiedNavigation(event) {
+    return event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
+  }
+
+  function isPageShellTarget(target) {
+    return target instanceof Element && target.matches(PAGE_SHELL);
+  }
+
+  function isPageShellNavigationTarget(target) {
+    const link = target instanceof Element ? target.closest("a") : null;
+    if (!link) return false;
+    return (link.getAttribute("hx-target") || link.getAttribute("data-hx-target")) === PAGE_SHELL;
   }
 
   // Cmd/Ctrl+K toggle + Escape
@@ -63,24 +142,37 @@
     }
   });
 
-  // Trigger button
+  document.addEventListener(
+    "pointerdown",
+    (e) => {
+      if (e.target.closest?.(RESULT) || isPageShellNavigationTarget(e.target)) {
+        closeSearch(dialog(), { clearQuery: true, animate: false });
+      }
+    },
+    true
+  );
+
   document.addEventListener("click", (e) => {
+    const result = e.target.closest?.(RESULT);
+    if (result) {
+      if (!isModifiedNavigation(e)) {
+        closeSearch(dialog(), { clearQuery: true, animate: false });
+      }
+      return;
+    }
+
     if (e.target.closest("[data-search-open]")) {
       e.preventDefault();
       openSearch(dialog());
+      return;
     }
-  });
 
-  // Close button
-  document.addEventListener("click", (e) => {
     if (e.target.closest("[data-search-close]")) {
       e.preventDefault();
       closeSearch(dialog());
+      return;
     }
-  });
 
-  // Backdrop click
-  document.addEventListener("click", (e) => {
     const d = dialog();
     if (e.target === d) closeSearch(d);
   });
@@ -112,29 +204,88 @@
       return;
     }
 
-    results.forEach((r) => r.classList.remove("is-active"));
+    clearActive(container);
     results[idx].classList.add("is-active");
     results[idx].scrollIntoView({ block: "nearest" });
   });
 
   // Mouse hover
-  document.addEventListener("mouseenter", (e) => {
-    const result = e.target.closest?.(RESULT);
-    if (!result) return;
-    const container = result.closest(RESULTS);
-    if (!container) return;
-    container.querySelectorAll(RESULT).forEach((r) => r.classList.remove("is-active"));
-    result.classList.add("is-active");
-  }, true);
+  document.addEventListener(
+    "mouseenter",
+    (e) => {
+      const result = e.target.closest?.(RESULT);
+      if (!result) return;
+      const container = result.closest(RESULTS);
+      if (!container) return;
+      clearActive(container);
+      result.classList.add("is-active");
+    },
+    true
+  );
+
+  document.addEventListener("htmx:beforeRequest", (e) => {
+    const target = e.detail?.target;
+    if (isPageShellTarget(target)) {
+      pageRequestInFlight = true;
+      closeSearch(dialog(), { clearQuery: true, animate: false });
+    }
+  });
+
+  document.addEventListener("htmx:afterRequest", (e) => {
+    if (isPageShellTarget(e.detail?.target)) {
+      pageRequestInFlight = false;
+    }
+  });
+
+  document.addEventListener("htmx:responseError", (e) => {
+    if (isPageShellTarget(e.detail?.target)) {
+      pageRequestInFlight = false;
+    }
+  });
+
+  document.addEventListener("htmx:sendAbort", (e) => {
+    if (isPageShellTarget(e.detail?.target)) {
+      pageRequestInFlight = false;
+    }
+  });
+
+  document.addEventListener("htmx:beforeHistorySave", () => {
+    closeSearch(dialog(), { clearQuery: true, animate: false });
+  });
+
+  document.addEventListener("htmx:historyRestore", () => {
+    closeSearch(dialog(), { clearQuery: true, animate: false });
+  });
 
   // HTMX swap: clear stale is-active
   document.addEventListener("htmx:afterSwap", (e) => {
     if (e.target.matches?.(RESULTS)) {
-      e.target.querySelectorAll(`${RESULT}.is-active`).forEach((r) => {
-        r.classList.remove("is-active");
-      });
+      clearActive(e.target);
     }
+
+    if (isPageShellTarget(e.target)) {
+      pageRequestInFlight = false;
+      if (pendingOpenAfterSwap) {
+        const d = dialog();
+        pendingOpenAfterSwap = false;
+        if (d && !d.open) {
+          d.showModal();
+          focusSearchInput(d);
+        }
+      }
+    }
+
     syncLabels();
+  });
+
+  window.addEventListener("pagehide", () => {
+    closeSearch(dialog(), { clearQuery: true, animate: false });
+  });
+
+  window.addEventListener("pageshow", (e) => {
+    if (e.persisted) {
+      closeSearch(dialog(), { clearQuery: true, animate: false });
+    }
   });
 
   if (document.readyState === "loading") {

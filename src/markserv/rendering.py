@@ -146,7 +146,7 @@ def _live_nav_attrs(href: str) -> dict[str, str]:
         "hx_get": live_href,
         "hx_target": "#page-shell",
         "hx_swap": "outerHTML",
-        "hx_push_url": "true",
+        "hx_push_url": href,
     }
 
 
@@ -429,9 +429,10 @@ def search_chrome() -> ComponentType:
                         data_search_input="",
                         aria_label="Search docs",
                         hx_get="/_search",
-                        hx_trigger="input delay:100ms, search",
+                        hx_trigger="input changed delay:100ms, search",
                         hx_target="[data-search-results]",
                         hx_swap="innerHTML",
+                        hx_sync="this:replace",
                     ),
                     html.button(
                         "Esc",

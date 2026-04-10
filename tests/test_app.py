@@ -138,7 +138,7 @@ def test_directory_mode_redirects_to_readme_and_hides_gitignored_files(tmp_path:
         assert 'data-live-fragment="/_live/docs/README.md"' in page_response.text
         assert 'sse-connect="/_events"' not in page_response.text
         assert 'hx-get="/_live/docs/guide.md"' in page_response.text
-        assert 'hx-push-url="true"' in page_response.text
+        assert 'hx-push-url="/docs/guide.md"' in page_response.text
         assert 'href="/docs/guide.md"' in page_response.text
         assert "guide" in page_response.text
 

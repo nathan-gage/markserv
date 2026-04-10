@@ -25,6 +25,8 @@ def test_search_ui_assets_are_included_in_rendered_page(tmp_path: Path) -> None:
     assert 'data-search-dialog=""' in response.text
     assert 'data-search-input=""' in response.text
     assert 'data-search-results=""' in response.text
+    assert 'hx-trigger="input changed delay:100ms, search"' in response.text
+    assert 'hx-sync="this:replace"' in response.text
 
 
 def test_search_endpoint_matches_titles_labels_headings_body_and_hidden_pages(tmp_path: Path) -> None:

@@ -160,17 +160,36 @@ body {
   view-transition-name: search-dialog;
 }
 
+html.theme-view-transition .search-dialog[open] {
+  view-transition-name: none;
+}
+
 .search-dialog::backdrop {
   background: rgb(0 0 0 / 28%);
 }
 
-/* ── View Transition: dialog open/close ───────────────── */
+/* ── View Transition: dialog open/close + theme swap ─── */
 
 /* Root group: clean backdrop crossfade */
 ::view-transition-old(root),
 ::view-transition-new(root) {
   animation-duration: 0.18s;
   animation-timing-function: ease-out;
+}
+
+html.theme-view-transition::view-transition-old(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+html.theme-view-transition.theme-view-to-light::view-transition-new(root) {
+  animation: theme-fade-in 0.62s cubic-bezier(0.25, 0.1, 0.25, 1) both;
+  mix-blend-mode: normal;
+}
+
+html.theme-view-transition.theme-view-to-dark::view-transition-new(root) {
+  animation: theme-fade-in 0.56s cubic-bezier(0.4, 0.1, 0.2, 1) both;
+  mix-blend-mode: normal;
 }
 
 /* Dialog entering — smooth glide down */
@@ -181,6 +200,16 @@ body {
 /* Dialog exiting — quick fade up */
 ::view-transition-old(search-dialog):only-child {
   animation: search-out 0.12s ease-out both;
+}
+
+@keyframes theme-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes search-in {
