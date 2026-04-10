@@ -1,6 +1,6 @@
 [project]
 name = "markserv"
-version = "1.1.2"
+dynamic = ["version"]
 description = "Preview local Markdown files and doc trees with live reload, sidebar navigation, anchors, and syntax highlighting"
 readme = { file = "README.md", content-type = "text/markdown" }
 authors = [{ name = "Nathan Gage", email = "nathan@sweetspot.so" }]
@@ -57,15 +57,22 @@ Releases = "https://github.com/nathan-gage/markserv/releases"
 markserv = "markserv.cli:main"
 "markserv.demo" = "markserv.demo:main"
 
+[tool.hatch.version]
+source = "uv-dynamic-versioning"
+
+[tool.uv-dynamic-versioning]
+vcs = "git"
+style = "pep440"
+bump = true
+
 [tool.uv]
 default-groups = ["dev", "lint"]
 
-[tool.uv.build-backend]
-package-data = { "markserv" = [
-  "public/**/*.css",
-  "public/**/*.js",
-  "public/**/*.LICENSE",
-] }
+[tool.hatch.build.targets.wheel]
+packages = ["src/markserv"]
+
+[tool.hatch.build.targets.sdist]
+include = ["/src", "/README.md", "/LICENSE", "/pyproject.toml"]
 
 [tool.ruff]
 line-length = 120
@@ -125,5 +132,5 @@ section_whitelines = 1
 whitelines = 1
 
 [build-system]
-requires = ["uv_build>=0.11.2,<0.12.0"]
-build-backend = "uv_build"
+requires = ["hatchling", "uv-dynamic-versioning>=0.7.0"]
+build-backend = "hatchling.build"
