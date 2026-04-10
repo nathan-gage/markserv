@@ -6,10 +6,7 @@ changelog:
       - question
       - wontfix
   categories:
-    - title: 📦 Dependencies
-      labels:
-        - dependencies
-    - title: 🚀 Enhancements
+    - title: 🚀 Highlights
       labels:
         - enhancement
     - title: 🐛 Fixes
@@ -18,3 +15,6 @@ changelog:
     - title: 📝 Documentation
       labels:
         - documentation
+    - title: 📦 Dependency updates
+      labels:
+        - dependencies
