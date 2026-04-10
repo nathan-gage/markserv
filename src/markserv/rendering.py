@@ -236,6 +236,11 @@ _ICON_CLIPBOARD_CHECK = (
     '<path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>'
     '<path d="m9 14 2 2 4-4"/></svg>'
 )
+_ICON_SEARCH = (
+    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"'
+    ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>'
+)
 
 
 _THEME_BUTTONS = (
@@ -391,6 +396,85 @@ def empty_shell(view: EmptyPageView) -> ComponentType:
     )
 
 
+def search_chrome() -> ComponentType:
+    return Fragment(
+        html.button(
+            SafeStr(_ICON_SEARCH),
+            html.span("Search", class_="search-trigger-label"),
+            html.span("Cmd/Ctrl K", class_="search-trigger-shortcut", data_search_shortcut=""),
+            type="button",
+            class_="search-trigger hit-area-1",
+            data_search_open="",
+            aria_label="Open search",
+            title="Search docs (Cmd/Ctrl+K)",
+        ),
+        html.div(
+            html.button(
+                type="button",
+                class_="search-backdrop",
+                data_search_close="",
+                aria_label="Close search",
+            ),
+            html.div(
+                html.div(
+                    html.span(SafeStr(_ICON_SEARCH), class_="search-input-icon"),
+                    html.input_(
+                        type="search",
+                        class_="search-input",
+                        placeholder="Search pages, headings, and content",
+                        autocomplete="off",
+                        autocapitalize="off",
+                        spellcheck="false",
+                        data_search_input="",
+                        aria_label="Search docs",
+                    ),
+                    html.button(
+                        "Esc",
+                        type="button",
+                        class_="search-close hit-area-1",
+                        data_search_close="",
+                        aria_label="Close search",
+                    ),
+                    class_="search-modal-header",
+                ),
+                html.div(
+                    html.p(
+                        "Start typing to search pages, headings, and content.",
+                        class_="search-state",
+                        data_search_state="",
+                    ),
+                    html.div(
+                        class_="search-results",
+                        data_search_results="",
+                        role="listbox",
+                        aria_label="Search results",
+                    ),
+                    class_="search-modal-body",
+                ),
+                html.div(
+                    html.span("Pages, headings, and body text", class_="search-footer-copy"),
+                    html.div(
+                        html.kbd("↑"),
+                        html.kbd("↓"),
+                        html.span("move"),
+                        html.kbd("Enter"),
+                        html.span("open"),
+                        class_="search-footer-hints",
+                    ),
+                    class_="search-modal-footer",
+                ),
+                class_="search-modal",
+                role="dialog",
+                aria_modal="true",
+                aria_label="Search docs",
+            ),
+            class_="search-overlay",
+            data_search_overlay="",
+            hidden="hidden",
+        ),
+    )
+
+
 def base_document(
     title: str, body_content: ComponentType, favicon_href: str | None = None, *, dev_reload: bool = False
 ) -> Component:
@@ -436,9 +520,11 @@ def base_document(
                 html.script(src=public_asset_href("js/clipboard.js")),
                 html.script(src=public_asset_href("js/favicon.js"), defer=True),
                 html.script(src=public_asset_href("js/live-reload.js"), defer=True),
+                html.script(src=public_asset_href("js/search.js"), defer=True),
                 html.script(src=public_asset_href("js/dev-reload.js"), defer=True) if dev_reload else Fragment(),
             ),
             html.body(
+                search_chrome(),
                 body_content,
                 html.script(src=public_asset_href("vendor/htmx.min.js")),
             ),

@@ -14,6 +14,7 @@ Point it at a README, notes directory, or docs tree and you get a clean GitHub-s
 
 - GitHub-flavored Markdown rendering via [`cmarkgfm`](https://github.com/theacodes/cmarkgfm)
 - Live reload while editing local docs
+- Cmd/Ctrl+K quick search across pages, headings, and body text
 - Sidebar navigation for directory-based docs
 - Automatic heading anchors for deep-linking
 - Syntax highlighting for fenced code blocks
@@ -64,6 +65,7 @@ markserv.demo
 
 - Renders common Markdown extensions like `.md` and `.markdown`
 - Watches Markdown files and reloads the browser when content changes
+- Supports Cmd/Ctrl+K quick search across page titles, headings, paths, and body text
 - Respects `.gitignore` while scanning, so ignored trees like `.venv/` are skipped
 - Serves linked local assets from the same file tree with safer defaults for hidden, executable, and sensitive files
 - In directory mode, shows a sidebar for browsing multiple Markdown pages

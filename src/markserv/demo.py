@@ -20,7 +20,7 @@ nav_order: 1
 
 Welcome to the built-in demo site.
 
-This sample tree exists so you can quickly try the renderer, sidebar navigation, live reload, theme control, and YAML front matter support.
+This sample tree exists so you can quickly try the renderer, sidebar navigation, live reload, Cmd/Ctrl+K search, theme control, and YAML front matter support.
 
 ## Try these pages
 
@@ -37,6 +37,7 @@ This sample tree exists so you can quickly try the renderer, sidebar navigation,
 - Notice that sidebar labels and ordering come from YAML front matter.
 - Open the [front matter demo](guides/features/front-matter.md).
 - Follow a link to the [hidden page](reference/hidden-page.md), which is routable but omitted from the sidebar.
+- Press **Cmd/Ctrl+K** to search across pages and headings.
 - Toggle between **system**, **light**, and **dark** themes.
 - Resize the window to see the responsive layout.
 
