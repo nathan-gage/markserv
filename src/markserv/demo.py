@@ -10,28 +10,43 @@ from .cli import DEFAULT_HOST, DEFAULT_PORT, python_reload_enabled, serve_applic
 from .site import SyntheticSite
 
 DEMO_DOCUMENTS = {
-    "README.md": """# markserv demo
+    "README.md": """---
+title: Demo Home
+nav_label: Welcome
+nav_order: 1
+---
+
+# markserv demo
 
 Welcome to the built-in demo site.
 
-This sample tree exists so you can quickly try the renderer, sidebar navigation, live reload, and theme control.
+This sample tree exists so you can quickly try the renderer, sidebar navigation, live reload, theme control, and YAML front matter support.
 
 ## Try these pages
 
 - [Quickstart](guides/quickstart.md)
+- [YAML front matter demo](guides/features/front-matter.md)
 - [GitHub-flavored markdown examples](guides/features/gfm.md)
 - [Nested navigation](guides/nested/deep-dive.md)
 - [Reference notes](reference/notes.md)
 
 ## What to try
 
+- Notice that sidebar labels and ordering come from YAML front matter.
+- Open the [front matter demo](guides/features/front-matter.md).
+- Follow a link to the [hidden page](reference/hidden-page.md), which is routable but omitted from the sidebar.
 - Toggle between **system**, **light**, and **dark** themes.
-- Follow links between nested folders.
 - Resize the window to see the responsive layout.
 
 > markserv is meant to feel nice for local docs, READMEs, and note collections.
 """,
-    "guides/quickstart.md": """# Quickstart
+    "guides/quickstart.md": """---
+title: Quickstart Guide
+nav_label: Start Here
+nav_order: 5
+---
+
+# Quickstart
 
 This page gives you a quick way to verify the basics.
 
@@ -59,9 +74,44 @@ print(root.resolve())
 | Sidebar nav | Ready |
 | Theme picker | Ready |
 
-Continue to the [feature examples](features/gfm.md).
+Continue to the [front matter demo](features/front-matter.md).
 """,
-    "guides/features/gfm.md": """# GitHub-flavored markdown examples
+    "guides/features/front-matter.md": """---
+title: YAML front matter
+nav_label: Front matter
+nav_order: 10
+---
+
+# YAML front matter
+
+This page uses YAML front matter to customize its browser title, sidebar label, and position in the nav.
+
+## Example
+
+```yaml
+---
+title: YAML front matter
+nav_label: Front matter
+nav_order: 10
+hidden: false
+---
+```
+
+## What it powers
+
+- **title** sets the browser title fallback
+- **nav_label** overrides the sidebar label
+- **nav_order** controls sidebar ordering
+- **hidden** keeps a page routable while removing it from the sidebar
+
+You can also open the [hidden page](../../reference/hidden-page.md) to see that last behavior in action.
+""",
+    "guides/features/gfm.md": """---
+nav_label: GFM examples
+nav_order: 20
+---
+
+# GitHub-flavored markdown examples
 
 This page exercises a few GFM features.
 
@@ -90,7 +140,11 @@ You can render **bold text**, *italic text*, ~~strikethrough~~, and `inline code
 
 Back to the [demo home](../../README.md).
 """,
-    "guides/nested/deep-dive.md": """# Deep dive
+    "guides/nested/deep-dive.md": """---
+nav_order: 15
+---
+
+# Deep dive
 
 This file lives in a nested folder so you can inspect sidebar behavior.
 
@@ -104,7 +158,11 @@ The current page should stay highlighted while its parent folders remain open.
 
 See the [reference notes](../../reference/notes.md) for a simple cross-link.
 """,
-    "reference/notes.md": """# Reference notes
+    "reference/notes.md": """---
+nav_order: 30
+---
+
+# Reference notes
 
 A small page for cross-link testing.
 
@@ -113,10 +171,22 @@ A small page for cross-link testing.
 - [Back home](../README.md)
 - [Quickstart](../guides/quickstart.md)
 - [Deep dive](../guides/nested/deep-dive.md)
+- [Hidden page](hidden-page.md)
 
 ## Inline HTML
 
 GitHub-flavored markdown rendering should also tolerate small inline HTML snippets like <kbd>Ctrl</kbd> + <kbd>C</kbd>.
+""",
+    "reference/hidden-page.md": """---
+title: Hidden page
+hidden: true
+---
+
+# Hidden page
+
+This page is still routable, but it is intentionally omitted from the sidebar because `hidden: true` is set in front matter.
+
+Head back to the [reference notes](notes.md) or the [demo home](../README.md).
 """,
 }
 
