@@ -8,7 +8,7 @@
 
 Point it at a README, notes directory, or docs tree and you get a clean GitHub-style reading view with live reload, sidebar navigation, heading anchors, syntax highlighting, and theme switching.
 
-![markserv screenshot](.github/assets/readme-screenshot.png)
+![markserv screenshot](https://raw.githubusercontent.com/nathan-gage/markserv/main/.github/assets/readme-screenshot.png)
 
 ## Why markserv?
 
