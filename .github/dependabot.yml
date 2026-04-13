@@ -13,7 +13,6 @@ updates:
       - "nathan-gage"
     labels:
       - "dependencies"
-      - "enhancement"
     versioning-strategy: "increase-if-necessary"
     groups:
       python-non-major:
@@ -35,7 +34,6 @@ updates:
       - "nathan-gage"
     labels:
       - "dependencies"
-      - "enhancement"
     groups:
       github-actions-non-major:
         patterns:
