@@ -4,7 +4,7 @@
   const RESULTS = "[data-search-results]";
   const SHORTCUT = "[data-search-shortcut]";
   const RESULT = ".search-result";
-  const PAGE_SHELL = "#page-shell";
+  const PAGE_SHELL = "#main-shell";
   const EMPTY_STATE = '<p class="search-state">Start typing to search pages, headings, and content.</p>';
 
   let pageRequestInFlight = false;

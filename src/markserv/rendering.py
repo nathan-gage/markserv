@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from html import escape as _html_escape
 from pathlib import Path
 from typing import TYPE_CHECKING
-from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
+from urllib.parse import parse_qsl, quote, unquote, urlencode, urljoin, urlsplit, urlunsplit
 
 from htmy import Component, ComponentType, Fragment, SafeStr, html
 
@@ -20,6 +20,11 @@ if TYPE_CHECKING:
 TITLE_RE = re.compile(r"^\s{0,3}#\s+(.+?)\s*$", re.MULTILINE)
 ANCHOR_TAG_RE = re.compile(r"<a(?P<attrs>\s[^>]*)>", re.IGNORECASE)
 HREF_ATTR_RE = re.compile(r'\shref="([^"]+)"')
+NAV_QUERY_PARAM = "nav"
+NAV_STATE_QUERY_PARAM = "nav_state"
+SIDEBAR_STATE_FORM_ID = "sidebar-state"
+MAIN_SHELL_ID = "main-shell"
+SIDEBAR_SHELL_ID = "sidebar-shell"
 
 
 @dataclass(frozen=True)
@@ -31,6 +36,8 @@ class DocsPageView:
     config_name: str
     root_dir: str
     home_href: str | None
+    nav_open_paths: tuple[str, ...]
+    nav_state_explicit: bool
     nav_items: tuple[NavNode, ...]
     dev_reload: bool = False
 
@@ -49,8 +56,42 @@ def extract_title(markdown_text: str, fallback: str) -> str:
     return title or fallback
 
 
-def docs_href(rel_path: str) -> str:
-    return f"/docs/{quote(rel_path, safe='/')}"
+def _encode_query_pairs(pairs: Sequence[tuple[str, str]]) -> str:
+    return urlencode(pairs, doseq=True, safe="/", quote_via=quote)
+
+
+def _with_nav_open_paths(
+    href: str,
+    nav_open_paths: Sequence[str],
+    *,
+    nav_state_explicit: bool = False,
+) -> str:
+    split = urlsplit(href)
+    query_pairs = [
+        (name, value)
+        for name, value in parse_qsl(split.query, keep_blank_values=True)
+        if name not in {NAV_QUERY_PARAM, NAV_STATE_QUERY_PARAM}
+    ]
+    if nav_state_explicit:
+        query_pairs.append((NAV_STATE_QUERY_PARAM, "1"))
+        if nav_open_paths:
+            query_pairs.extend((NAV_QUERY_PARAM, path) for path in nav_open_paths)
+        else:
+            query_pairs.append((NAV_QUERY_PARAM, ""))
+    return urlunsplit((split.scheme, split.netloc, split.path, _encode_query_pairs(query_pairs), split.fragment))
+
+
+def docs_href(
+    rel_path: str,
+    nav_open_paths: Sequence[str] = (),
+    *,
+    nav_state_explicit: bool = False,
+) -> str:
+    return _with_nav_open_paths(
+        f"/docs/{quote(rel_path, safe='/')}",
+        nav_open_paths,
+        nav_state_explicit=nav_state_explicit,
+    )
 
 
 def public_asset_href(rel_path: str) -> str:
@@ -66,7 +107,14 @@ def build_empty_view(site: SiteSource, *, dev_reload: bool = False) -> EmptyPage
 
 
 def build_docs_view(
-    site: SiteSource, page_index: PageIndex, rel_path: str, markdown_text: str, *, dev_reload: bool = False
+    site: SiteSource,
+    page_index: PageIndex,
+    rel_path: str,
+    markdown_text: str,
+    *,
+    nav_open_paths: Sequence[str] = (),
+    nav_state_explicit: bool = False,
+    dev_reload: bool = False,
 ) -> DocsPageView:
     page = page_index.page_for(rel_path)
     fallback_title = humanize_name(rel_path.rsplit("/", 1)[-1].rsplit(".", 1)[0])
@@ -75,11 +123,17 @@ def build_docs_view(
         if page is not None and page.title is not None
         else extract_title(markdown_text, fallback=fallback_title)
     )
+    nav_open_paths = tuple(nav_open_paths)
     home_doc = page_index.choose_default_doc(preferred=site.default_doc)
-    nav_items = page_index.nav_items(rel_path)
+    nav_items = page_index.nav_items(rel_path, open_paths=nav_open_paths, nav_state_explicit=nav_state_explicit)
     with_sidebar = site.show_navigation and bool(nav_items)
 
-    rendered_markdown = _enhance_markdown_links(render_markdown(markdown_text), rel_path)
+    rendered_markdown = _enhance_markdown_links(
+        render_markdown(markdown_text),
+        rel_path,
+        nav_open_paths,
+        nav_state_explicit=nav_state_explicit,
+    )
 
     return DocsPageView(
         title=title,
@@ -89,6 +143,8 @@ def build_docs_view(
         config_name=site.name,
         root_dir=site.root_label,
         home_href=None if home_doc is None else docs_href(home_doc),
+        nav_open_paths=nav_open_paths,
+        nav_state_explicit=nav_state_explicit,
         nav_items=nav_items,
         dev_reload=dev_reload,
     )
@@ -109,15 +165,14 @@ _ICON_FOLDER_OPEN = SafeStr(
 )
 
 
-def _flatten_nav(items: tuple[NavNode, ...]) -> list[NavFile]:
-    """Recursively collect all files from a nav tree."""
-    result: list[NavFile] = []
-    for item in items:
-        if isinstance(item, NavDirectory):
-            result.extend(_flatten_nav(item.children))
-        else:
-            result.append(item)
-    return result
+_ICON_CHEVRON = SafeStr(
+    '<svg class="nav-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none"'
+    ' stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">'
+    '<path d="m9 18 6-6-6-6"/></svg>'
+)
+
+_NAV_TREE_BASE = 0.65  # rem – left padding for depth-0 items
+_NAV_TREE_STEP = 1.2  # rem added per nesting depth
 
 
 def _htmx_request_href(href: str) -> str | None:
@@ -136,9 +191,23 @@ def _htmx_nav_attrs(href: str) -> dict[str, str]:
         return {}
     return {
         "hx_get": request_href,
-        "hx_target": "#page-shell",
+        "hx_target": f"#{MAIN_SHELL_ID}",
+        "hx_select": f"#{MAIN_SHELL_ID}",
         "hx_swap": "outerHTML",
         "hx_push_url": href,
+        "hx_include": f"#{SIDEBAR_STATE_FORM_ID}",
+    }
+
+
+def _htmx_sidebar_attrs(href: str) -> dict[str, str]:
+    request_href = _htmx_request_href(href)
+    if request_href is None:
+        return {}
+    return {
+        "hx_get": request_href,
+        "hx_target": f"#{SIDEBAR_SHELL_ID}",
+        "hx_select": f"#{SIDEBAR_SHELL_ID}",
+        "hx_swap": "outerHTML",
     }
 
 
@@ -167,7 +236,13 @@ def _resolve_markdown_docs_href(current_rel_path: str, href: str) -> str | None:
     return urlunsplit(("", "", canonical_path, resolved.query, resolved.fragment))
 
 
-def _enhance_markdown_links(rendered_html: str, current_rel_path: str) -> str:
+def _enhance_markdown_links(
+    rendered_html: str,
+    current_rel_path: str,
+    nav_open_paths: Sequence[str],
+    *,
+    nav_state_explicit: bool = False,
+) -> str:
     def replace(match: re.Match[str]) -> str:
         attrs = match.group("attrs")
         if "hx-get=" in attrs or "data-hx-get=" in attrs:
@@ -192,48 +267,155 @@ def _enhance_markdown_links(rendered_html: str, current_rel_path: str) -> str:
     return ANCHOR_TAG_RE.sub(replace, rendered_html)
 
 
-def _nav_link(nav_file: NavFile) -> ComponentType:
-    cls = "nav-link is-active" if nav_file.active else "nav-link"
-    return html.a(nav_file.label, href=nav_file.href, class_=cls, **_htmx_nav_attrs(nav_file.href))
+def _nav_tree_pad(depth: int) -> str:
+    return f"padding-left: {_NAV_TREE_BASE + depth * _NAV_TREE_STEP}rem"
 
 
-def _render_section_children(children: tuple[NavNode, ...], group: list[ComponentType]) -> None:
-    """Render a section's children: direct files first, then sub-dirs as sub-sections."""
-    for child in children:
-        if not isinstance(child, NavDirectory):
-            group.append(_nav_link(child))
-    for child in children:
-        if isinstance(child, NavDirectory):
-            sub_icon = _ICON_FOLDER_OPEN if child.open else _ICON_FOLDER
-            sub: list[ComponentType] = [
-                html.div(
-                    sub_icon,
-                    html.span(humanize_name(child.name), class_="nav-subsection-label"),
-                    class_="nav-subsection",
-                ),
-            ]
-            for f in _flatten_nav(child.children):
-                sub.append(_nav_link(f))
-            group.append(html.div(*sub, class_="nav-subgroup"))
+def _sorted_nav_open_paths(paths: Sequence[str]) -> tuple[str, ...]:
+    return tuple(sorted(dict.fromkeys(paths), key=lambda path: (path.count("/"), path.casefold())))
 
 
-def render_nav_items(items: tuple[NavNode, ...]) -> ComponentType:
+def _toggle_nav_open_paths(nav_open_paths: Sequence[str], directory_path: str) -> tuple[str, ...]:
+    if directory_path in nav_open_paths:
+        return _sorted_nav_open_paths(tuple(path for path in nav_open_paths if path != directory_path))
+    return _sorted_nav_open_paths((*nav_open_paths, directory_path))
+
+
+def _open_nav_open_paths(nav_open_paths: Sequence[str], directory_paths: Sequence[str]) -> tuple[str, ...]:
+    return _sorted_nav_open_paths((*nav_open_paths, *directory_paths))
+
+
+def _nav_children(directory: NavDirectory) -> tuple[tuple[NavFile, ...], tuple[NavDirectory, ...]]:
+    files = tuple(child for child in directory.children if not isinstance(child, NavDirectory))
+    directories = tuple(child for child in directory.children if isinstance(child, NavDirectory))
+    return files, directories
+
+
+def _collapsed_nav_chain(directory: NavDirectory) -> tuple[NavDirectory, ...]:
+    chain = [directory]
+    current = directory
+    while True:
+        files, directories = _nav_children(current)
+        if files or len(directories) != 1:
+            return tuple(chain)
+        current = directories[0]
+        chain.append(current)
+
+
+def _nav_folder_label(chain: Sequence[NavDirectory]) -> ComponentType:
+    head, *tail = [humanize_name(directory.name) for directory in chain]
+    if not tail:
+        return html.span(head, class_="nav-folder-name")
+    return Fragment(
+        html.span(head, class_="nav-folder-name"),
+        html.span(" / " + " / ".join(tail), class_="nav-folder-suffix"),
+    )
+
+
+def _nav_tree_item(
+    nav_file: NavFile,
+    depth: int,
+    nav_open_paths: Sequence[str],
+    *,
+    nav_state_explicit: bool = False,
+) -> ComponentType:
+    cls = "nav-link is-active is-highlighted" if nav_file.active else "nav-link"
+    href = nav_file.href
+    return html.div(
+        html.a(nav_file.label, href=href, class_=cls, style=_nav_tree_pad(depth), **_htmx_nav_attrs(href)),
+        class_="nav-row",
+    )
+
+
+def _nav_tree_folder(
+    directory: NavDirectory,
+    depth: int,
+    current_rel_path: str,
+    nav_open_paths: Sequence[str],
+    *,
+    nav_state_explicit: bool = False,
+) -> ComponentType:
+    visible_chain = (directory,) if directory.open else _collapsed_nav_chain(directory)
+    toggle_paths = (
+        _toggle_nav_open_paths(nav_open_paths, directory.path)
+        if directory.open
+        else _open_nav_open_paths(nav_open_paths, tuple(item.path for item in visible_chain))
+    )
+    toggle_request_href = docs_href(current_rel_path, toggle_paths, nav_state_explicit=True)
+    icon = _ICON_FOLDER_OPEN if directory.open else _ICON_FOLDER
+
+    files, directories = _nav_children(directory)
+    children: list[ComponentType] = []
+    child_depth = depth + 1
+    if directory.open:
+        for file_child in files:
+            children.append(
+                _nav_tree_item(file_child, child_depth, nav_open_paths, nav_state_explicit=nav_state_explicit)
+            )
+        for directory_child in directories:
+            children.append(
+                _nav_tree_folder(
+                    directory_child,
+                    child_depth,
+                    current_rel_path,
+                    nav_open_paths,
+                    nav_state_explicit=nav_state_explicit,
+                )
+            )
+
+    children_block: ComponentType = Fragment()
+    if children:
+        children_block = html.div(*children, class_="nav-folder-children")
+
+    header_cls = (
+        "nav-folder-header is-active-branch is-highlighted"
+        if current_rel_path.startswith(f"{directory.path}/")
+        else "nav-folder-header"
+    )
+    cls = "nav-folder is-open" if directory.open else "nav-folder"
+    return html.div(
+        html.button(
+            _ICON_CHEVRON,
+            icon,
+            _nav_folder_label(visible_chain),
+            type="button",
+            class_=header_cls,
+            style=_nav_tree_pad(depth),
+            aria_expanded="true" if directory.open else "false",
+            **_htmx_sidebar_attrs(toggle_request_href),
+        ),
+        children_block,
+        class_=cls,
+    )
+
+
+def render_nav_items(
+    items: tuple[NavNode, ...],
+    current_rel_path: str,
+    nav_open_paths: Sequence[str],
+    *,
+    nav_state_explicit: bool = False,
+) -> ComponentType:
     if not items:
         return Fragment()
 
     elements: list[ComponentType] = []
-    root_links = [_nav_link(item) for item in items if not isinstance(item, NavDirectory)]
-    if root_links:
-        elements.append(html.div(*root_links, class_="nav-group"))
     for item in items:
         if not isinstance(item, NavDirectory):
-            continue
-        icon = _ICON_FOLDER_OPEN if item.open else _ICON_FOLDER
-        group: list[ComponentType] = [
-            html.div(icon, html.span(humanize_name(item.name), class_="nav-section-label"), class_="nav-section"),
-        ]
-        _render_section_children(item.children, group)
-        elements.append(html.div(*group, class_="nav-group"))
+            elements.append(
+                _nav_tree_item(item, depth=0, nav_open_paths=nav_open_paths, nav_state_explicit=nav_state_explicit)
+            )
+    for item in items:
+        if isinstance(item, NavDirectory):
+            elements.append(
+                _nav_tree_folder(
+                    item,
+                    depth=0,
+                    current_rel_path=current_rel_path,
+                    nav_open_paths=nav_open_paths,
+                    nav_state_explicit=nav_state_explicit,
+                )
+            )
 
     return html.nav(*elements, class_="nav-list")
 
@@ -325,91 +507,131 @@ def floating_theme_picker() -> ComponentType:
     )
 
 
-def _sidebar_toggle_btn() -> ComponentType:
-    return html.button(
-        html.span(SafeStr(_ICON_SIDEBAR_CLOSE), class_="sidebar-icon-close"),
-        html.span(SafeStr(_ICON_SIDEBAR_OPEN), class_="sidebar-icon-open"),
-        type="button",
-        class_="sidebar-toggle hit-area-2",
-        data_sidebar_toggle="",
-        aria_label="Toggle sidebar",
-        title="Toggle sidebar",
+def _sidebar_toggle() -> ComponentType:
+    return Fragment(
+        html.input_(
+            type="checkbox",
+            id="sidebar-collapsed-toggle",
+            class_="sidebar-collapse-toggle",
+            hx_preserve="",
+            aria_hidden="true",
+            tabindex="-1",
+        ),
+        html.label(
+            html.span(SafeStr(_ICON_SIDEBAR_CLOSE), class_="sidebar-icon-close"),
+            html.span(SafeStr(_ICON_SIDEBAR_OPEN), class_="sidebar-icon-open"),
+            for_="sidebar-collapsed-toggle",
+            class_="sidebar-toggle hit-area-2",
+            aria_label="Toggle sidebar",
+            title="Toggle sidebar",
+        ),
+    )
+
+
+def _sidebar_state_form(view: DocsPageView) -> ComponentType:
+    inputs: list[ComponentType] = []
+    if view.nav_state_explicit:
+        inputs.append(html.input_(type="hidden", name=NAV_STATE_QUERY_PARAM, value="1"))
+    for path in view.nav_open_paths:
+        inputs.append(html.input_(type="hidden", name=NAV_QUERY_PARAM, value=path))
+    return html.form(*inputs, id=SIDEBAR_STATE_FORM_ID, class_="sidebar-state")
+
+
+def sidebar_shell(view: DocsPageView, *, oob: bool = False) -> ComponentType:
+    title: ComponentType
+    if view.home_href is not None:
+        title = html.a(view.config_name, href=view.home_href, class_="sidebar-title", **_htmx_nav_attrs(view.home_href))
+    else:
+        title = html.span(view.config_name, class_="sidebar-title")
+
+    attrs: dict[str, str] = {"id": SIDEBAR_SHELL_ID, "class_": "sidebar"}
+    if oob:
+        attrs["hx_swap_oob"] = "outerHTML"
+
+    return html.aside(
+        _sidebar_state_form(view),
+        html.div(
+            html.div(title, class_="sidebar-header"),
+            html.div(
+                html.div(
+                    html.span(view.root_dir, class_="sidebar-path-text"),
+                    html.button(
+                        SafeStr(_ICON_CLIPBOARD),
+                        SafeStr(_ICON_CLIPBOARD_CHECK),
+                        type="button",
+                        class_="copy-btn copy-btn-sm hit-area-1",
+                        data_copy_text=view.root_dir,
+                        aria_label="Copy path",
+                        title="Copy path",
+                    ),
+                    class_="content-path-group",
+                ),
+                class_="sidebar-path",
+            ),
+            class_="sidebar-top",
+        ),
+        render_nav_items(
+            view.nav_items,
+            view.rel_path,
+            view.nav_open_paths,
+            nav_state_explicit=view.nav_state_explicit,
+        ),
+        html.div(
+            theme_picker(),
+            class_="sidebar-footer",
+        ),
+        **attrs,
+    )
+
+
+def main_shell(view: DocsPageView) -> ComponentType:
+    return html.main(
+        html.div(
+            html.div(
+                html.span(view.rel_path, class_="content-path"),
+                html.button(
+                    SafeStr(_ICON_CLIPBOARD),
+                    SafeStr(_ICON_CLIPBOARD_CHECK),
+                    type="button",
+                    class_="copy-btn hit-area-1",
+                    data_copy_text=view.rel_path,
+                    aria_label="Copy file path",
+                    title="Copy file path",
+                ),
+                class_="content-path-group",
+            ),
+            class_="content-header",
+        ),
+        html.div(
+            html.article(SafeStr(view.rendered_markdown), class_="markdown-body"),
+            class_="markdown-frame",
+        ),
+        id=MAIN_SHELL_ID,
+        class_="main",
+        data_icon=icon_href(view.rel_path),
     )
 
 
 def docs_shell(view: DocsPageView) -> ComponentType:
     sidebar: ComponentType = Fragment()
-    toggle_btn: ComponentType = Fragment()
     theme_float: ComponentType = Fragment()
+    sidebar_toggle: ComponentType = Fragment()
     if not view.with_sidebar:
         theme_float = floating_theme_picker()
     if view.with_sidebar:
-        title: ComponentType
-        if view.home_href is not None:
-            title = html.a(
-                view.config_name, href=view.home_href, class_="sidebar-title", **_htmx_nav_attrs(view.home_href)
-            )
-        else:
-            title = html.span(view.config_name, class_="sidebar-title")
-
-        toggle_btn = _sidebar_toggle_btn()
-        sidebar = Fragment(
-            html.aside(
-                html.div(title, class_="sidebar-header"),
-                html.div(
-                    html.div(
-                        html.span(view.root_dir, class_="sidebar-path-text"),
-                        html.button(
-                            SafeStr(_ICON_CLIPBOARD),
-                            SafeStr(_ICON_CLIPBOARD_CHECK),
-                            type="button",
-                            class_="copy-btn copy-btn-sm hit-area-1",
-                            data_copy_text=view.root_dir,
-                            aria_label="Copy path",
-                            title="Copy path",
-                        ),
-                        class_="content-path-group",
-                    ),
-                    class_="sidebar-path",
-                ),
-                render_nav_items(view.nav_items),
-                html.div(
-                    theme_picker(),
-                    class_="sidebar-footer",
-                ),
-                class_="sidebar",
-            ),
-            html.div(class_="sidebar-resize hit-area-x-2"),
+        sidebar_toggle = _sidebar_toggle()
+        sidebar = html.div(
+            sidebar_shell(view),
+            html.div(class_="sidebar-resize hit-area-x-2", aria_hidden="true"),
+            class_="sidebar-frame",
         )
 
     shell_class = "app-shell with-sidebar" if view.with_sidebar else "app-shell"
     return html.div(
-        toggle_btn,
+        sidebar_toggle,
         sidebar,
         theme_float,
-        html.main(
-            html.div(
-                html.div(
-                    html.span(view.rel_path, class_="content-path"),
-                    html.button(
-                        SafeStr(_ICON_CLIPBOARD),
-                        SafeStr(_ICON_CLIPBOARD_CHECK),
-                        type="button",
-                        class_="copy-btn hit-area-1",
-                        data_copy_text=view.rel_path,
-                        aria_label="Copy file path",
-                        title="Copy file path",
-                    ),
-                    class_="content-path-group",
-                ),
-                class_="content-header",
-            ),
-            html.div(
-                html.article(SafeStr(view.rendered_markdown), class_="markdown-body"),
-                class_="markdown-frame",
-            ),
-            class_="main",
-        ),
+        main_shell(view),
         id="page-shell",
         class_=shell_class,
         data_icon=icon_href(view.rel_path),
@@ -476,6 +698,7 @@ def search_chrome() -> ComponentType:
                         hx_swap="innerHTML",
                         hx_sync="this:replace",
                         hx_indicator=".search-input-icon",
+                        hx_include=f"#{SIDEBAR_STATE_FORM_ID}",
                     ),
                     html.button(
                         "Esc",
@@ -520,7 +743,13 @@ def search_chrome() -> ComponentType:
     )
 
 
-def render_search_results_fragment(results: Sequence[SearchResult], query: str) -> str:
+def render_search_results_fragment(
+    results: Sequence[SearchResult],
+    query: str,
+    nav_open_paths: Sequence[str] = (),
+    *,
+    nav_state_explicit: bool = False,
+) -> str:
     """Render search results as an HTML fragment for HTMX swap."""
     if not query.strip():
         return '<p class="search-state">Start typing to search pages, headings, and content.</p>'
@@ -528,11 +757,12 @@ def render_search_results_fragment(results: Sequence[SearchResult], query: str) 
         return '<p class="search-state">No matching docs found.</p>'
     parts: list[str] = []
     for r in results:
+        href = r.href
         snippet = ""
         if r.snippet:
             snippet = f'<span class="search-result-snippet">{_html_escape(r.snippet)}</span>'
         parts.append(
-            f'<a href="{_html_escape(r.href)}" class="search-result"{_htmx_nav_html_attrs(r.href)}>'
+            f'<a href="{_html_escape(href)}" class="search-result"{_htmx_nav_html_attrs(href)}>'
             f'<span class="search-result-header">'
             f'<span class="search-result-title">{_html_escape(r.title)}</span>'
             f'<span class="search-result-path">{_html_escape(r.rel_path)}</span>'
@@ -616,11 +846,16 @@ def render_empty_page(view: EmptyPageView) -> Component:
     return base_document("markserv", empty_shell(view), dev_reload=view.dev_reload)
 
 
+def render_sidebar_fragment(view: DocsPageView) -> ComponentType:
+    return sidebar_shell(view)
+
+
 def render_docs_fragment(view: DocsPageView) -> ComponentType:
     return Fragment(
         html.title(f"{view.title} · markserv", hx_swap_oob="true"),
         html.link(rel="icon", type="image/png", href=icon_href(view.rel_path), id="favicon", hx_swap_oob="outerHTML"),
-        docs_shell(view),
+        sidebar_shell(view, oob=True),
+        main_shell(view),
     )
 
 

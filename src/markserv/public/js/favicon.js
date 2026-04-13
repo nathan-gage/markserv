@@ -1,12 +1,12 @@
 (() => {
-  const PAGE_SHELL = "#page-shell";
+  const PAGE_SHELL = "#main-shell";
 
   function isPageShellTarget(target) {
     return target instanceof Element && target.matches(PAGE_SHELL);
   }
 
   function updateFavicon() {
-    const shell = document.getElementById("page-shell");
+    const shell = document.getElementById("main-shell") || document.getElementById("page-shell");
     if (!shell) return;
 
     const href = shell.dataset.icon;

@@ -1,5 +1,5 @@
 (() => {
-  const PAGE_SHELL = "#page-shell";
+  const PAGE_SHELL = "#main-shell";
 
   let source = null;
   let reloadRequest = null;
@@ -47,7 +47,7 @@
     }
 
     reloadRequest = window.htmx.ajax("GET", pageHref, {
-      target: "#page-shell",
+      target: "#main-shell",
       swap: "outerHTML",
     });
 

@@ -1,6 +1,6 @@
 (() => {
   const STORAGE_KEY = "markserv-theme";
-  const PAGE_SHELL = "#page-shell";
+  const PAGE_SHELL = "#main-shell";
   const SYSTEM_THEME = "system";
   const LIGHT_THEME = "light";
   const DARK_THEME = "dark";
