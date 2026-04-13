@@ -550,22 +550,25 @@ def sidebar_shell(view: DocsPageView, *, oob: bool = False) -> ComponentType:
 
     return html.aside(
         _sidebar_state_form(view),
-        html.div(title, class_="sidebar-header"),
         html.div(
+            html.div(title, class_="sidebar-header"),
             html.div(
-                html.span(view.root_dir, class_="sidebar-path-text"),
-                html.button(
-                    SafeStr(_ICON_CLIPBOARD),
-                    SafeStr(_ICON_CLIPBOARD_CHECK),
-                    type="button",
-                    class_="copy-btn copy-btn-sm hit-area-1",
-                    data_copy_text=view.root_dir,
-                    aria_label="Copy path",
-                    title="Copy path",
+                html.div(
+                    html.span(view.root_dir, class_="sidebar-path-text"),
+                    html.button(
+                        SafeStr(_ICON_CLIPBOARD),
+                        SafeStr(_ICON_CLIPBOARD_CHECK),
+                        type="button",
+                        class_="copy-btn copy-btn-sm hit-area-1",
+                        data_copy_text=view.root_dir,
+                        aria_label="Copy path",
+                        title="Copy path",
+                    ),
+                    class_="content-path-group",
                 ),
-                class_="content-path-group",
+                class_="sidebar-path",
             ),
-            class_="sidebar-path",
+            class_="sidebar-top",
         ),
         render_nav_items(
             view.nav_items,
