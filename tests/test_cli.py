@@ -12,6 +12,7 @@ import markserv.cli as cli
 class FakeServer:
     def __init__(self) -> None:
         self.should_exit = False
+        self.force_exit = False
         self.run_called = False
 
     def run(self) -> None:
@@ -143,6 +144,7 @@ def test_cli_uses_uvicorn_reload_when_env_var_set(monkeypatch: pytest.MonkeyPatc
             "log_level": "warning",
             "access_log": False,
             "log_config": None,
+            "timeout_graceful_shutdown": cli.SHUTDOWN_GRACE_SECONDS,
         }
         observed["target_env"] = os.environ.get(cli.TARGET_ENV_VAR)
 
@@ -170,6 +172,7 @@ def test_cli_uses_uvicorn_reload_when_env_var_set(monkeypatch: pytest.MonkeyPatc
         "log_level": "warning",
         "access_log": False,
         "log_config": None,
+        "timeout_graceful_shutdown": cli.SHUTDOWN_GRACE_SECONDS,
     }
     assert cli.TARGET_ENV_VAR not in os.environ
 
@@ -181,4 +184,5 @@ def test_request_server_shutdown_marks_server_and_event() -> None:
     cli._request_server_shutdown(server, stop_event)
 
     assert server.should_exit is True
+    assert server.force_exit is True
     assert stop_event.is_set()

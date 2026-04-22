@@ -25,6 +25,7 @@ from .site import build_config, build_file_site
 
 class StoppableServer(Protocol):
     should_exit: bool
+    force_exit: bool
 
     def run(self) -> None: ...
 
@@ -36,6 +37,7 @@ DEFAULT_PORT = 4422
 PYTHON_RELOAD_ENV_VAR = "MARKSERV_PYTHON_RELOAD"
 TARGET_ENV_VAR = "MARKSERV_TARGET"
 PYTHON_RELOAD_DIR = Path(__file__).resolve().parent
+SHUTDOWN_GRACE_SECONDS = 1
 
 app = App(
     name="markserv",
@@ -123,6 +125,7 @@ def create_server(app: Any, *, host: str, port: int) -> Server:
             log_level="warning",
             access_log=False,
             log_config=None,
+            timeout_graceful_shutdown=SHUTDOWN_GRACE_SECONDS,
         )
     )
 
@@ -138,6 +141,7 @@ def run_python_reloading_server(app_factory_import: str, *, host: str, port: int
         log_level="warning",
         access_log=False,
         log_config=None,
+        timeout_graceful_shutdown=SHUTDOWN_GRACE_SECONDS,
     )
 
 
@@ -150,6 +154,7 @@ def _request_server_shutdown(server: StoppableServer, stop_event: threading.Even
         return
     console.print("[dim]Stopping server...[/dim]")
     server.should_exit = True
+    server.force_exit = True
     stop_event.set()
 
 
