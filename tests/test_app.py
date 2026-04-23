@@ -59,32 +59,35 @@ def test_python_reload_mode_includes_dev_reload_client(monkeypatch: pytest.Monke
         assert 'data-dev-reload="true"' in page_response.text
 
 
+class CountingSite:
+    name: str = "docs"
+    root_label: str = "/virtual/docs"
+    default_doc: str | None = None
+    show_navigation: bool = True
+    watch_root: Path | None = None
+    watch_filter: WatchPathFilter | None = None
+
+    def __init__(self) -> None:
+        self.page_index_calls = 0
+        self.read_markdown_calls = 0
+        self._page_index = PageIndex((MarkdownPage(rel_path="README.md", label="Home"),))
+
+    def page_index(self) -> PageIndex:
+        self.page_index_calls += 1
+        return self._page_index
+
+    def read_markdown(self, rel_path: str) -> str | None:
+        self.read_markdown_calls += 1
+        return "# Home\n" if rel_path == "README.md" else None
+
+    def resolve_asset(self, rel_path: str) -> Path | None:
+        return None
+
+    def is_directory(self, rel_path: str) -> bool:
+        return False
+
+
 def test_page_index_is_cached_across_requests() -> None:
-    class CountingSite:
-        name: str = "docs"
-        root_label: str = "/virtual/docs"
-        default_doc: str | None = None
-        show_navigation: bool = True
-        watch_root: Path | None = None
-        watch_filter: WatchPathFilter | None = None
-
-        def __init__(self) -> None:
-            self.page_index_calls = 0
-            self._page_index = PageIndex((MarkdownPage(rel_path="README.md", label="Home"),))
-
-        def page_index(self) -> PageIndex:
-            self.page_index_calls += 1
-            return self._page_index
-
-        def read_markdown(self, rel_path: str) -> str | None:
-            return "# Home\n" if rel_path == "README.md" else None
-
-        def resolve_asset(self, rel_path: str) -> Path | None:
-            return None
-
-        def is_directory(self, rel_path: str) -> bool:
-            return False
-
     site = CountingSite()
 
     with TestClient(create_app(site)) as client:
@@ -99,6 +102,20 @@ def test_page_index_is_cached_across_requests() -> None:
         assert fragment_response.status_code == 200
 
     assert site.page_index_calls == 1
+
+
+def test_docs_view_is_cached_across_requests() -> None:
+    site = CountingSite()
+
+    with TestClient(create_app(site)) as client:
+        first_response = client.get("/docs/README.md")
+        second_response = client.get("/docs/README.md")
+        fragment_response = client.get("/docs/README.md", headers={"HX-Request": "true"})
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 200
+    assert fragment_response.status_code == 200
+    assert site.read_markdown_calls == 1
 
 
 def test_directory_mode_redirects_to_readme_and_hides_gitignored_files(tmp_path: Path) -> None:
@@ -132,6 +149,11 @@ def test_directory_mode_redirects_to_readme_and_hides_gitignored_files(tmp_path:
         assert 'data-theme-btn="system"' in page_response.text
         assert 'data-theme-btn="light"' in page_response.text
         assert 'data-theme-btn="dark"' in page_response.text
+        assert 'class="floating-theme-picker"' in page_response.text
+        assert 'class="sidebar-icon-close"' in page_response.text
+        assert 'class="sidebar-icon-open"' in page_response.text
+        assert 'class="sidebar"' in page_response.text
+        assert 'class-="sidebar"' not in page_response.text
         assert "hit-area-1" in page_response.text
         assert "/public/js/sidebar.js" in page_response.text
         assert "/public/vendor/htmx.min.js" in page_response.text
@@ -148,6 +170,7 @@ def test_directory_mode_redirects_to_readme_and_hides_gitignored_files(tmp_path:
         assert fragment_response.status_code == 200
         assert 'id="main-shell"' in fragment_response.text
         assert 'id="sidebar-shell"' in fragment_response.text
+        assert 'class="sidebar"' in fragment_response.text
         assert 'hx-swap-oob="true"' in fragment_response.text
         assert 'id="favicon"' in fragment_response.text
         assert 'hx-swap-oob="outerHTML"' in fragment_response.text

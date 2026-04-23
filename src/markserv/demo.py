@@ -4,10 +4,12 @@ from typing import Annotated
 
 from cyclopts import App, Parameter
 from cyclopts.help import PlainFormatter
+from fastapi import FastAPI
 
 from .app import create_app
-from .cli import DEFAULT_HOST, DEFAULT_PORT, python_reload_enabled, serve_application
-from .site import SyntheticSite
+from .cli import DEFAULT_HOST, DEFAULT_PORT, serve_application
+from .content import SyntheticSite
+from .settings import python_reload_enabled
 
 DEMO_DOCUMENTS = {
     "README.md": """---
@@ -254,7 +256,7 @@ def build_demo_site() -> SyntheticSite:
     )
 
 
-def create_demo_app() -> object:
+def create_demo_app() -> FastAPI:
     return create_app(build_demo_site())
 
 

@@ -697,6 +697,16 @@ html.theme-view-transition.theme-view-to-dark::view-transition-new(root) {
   opacity: 0;
 }
 
+.sidebar-collapse-toggle:checked ~ .floating-theme-picker {
+  visibility: visible;
+  opacity: 0.5;
+  pointer-events: auto;
+}
+
+.sidebar-collapse-toggle:checked ~ .floating-theme-picker:hover {
+  opacity: 1;
+}
+
 .sidebar-collapse-toggle:checked ~ .main .content-header {
   padding-left: 3rem;
 }
@@ -1069,6 +1079,12 @@ a.sidebar-title:hover {
   transition: opacity 0.25s, gap 0.3s, border-color 0.25s;
 }
 
+.app-shell.with-sidebar .floating-theme-picker {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
 .floating-theme-picker:hover {
   opacity: 1;
   gap: 2px;
@@ -1180,6 +1196,12 @@ a.sidebar-title:hover {
 
   .sidebar-toggle {
     display: none;
+  }
+
+  .app-shell.with-sidebar .floating-theme-picker {
+    visibility: visible;
+    opacity: 0.5;
+    pointer-events: auto;
   }
 
   .sidebar-frame,

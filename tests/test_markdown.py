@@ -39,7 +39,21 @@ def test_parse_markdown_document_supports_yaml_front_matter() -> None:
         nav_label="Start Here",
         nav_order=7.5,
         hidden=False,
+        extras={
+            "tags": ("docs", "guide"),
+            "nested": {"owner": "team-docs"},
+        },
     )
+
+
+def test_parse_markdown_document_freezes_extra_metadata() -> None:
+    document = parse_markdown_document("---\ntags:\n  - docs\nmeta:\n  owner: docs\n---\n# Hello\n")
+
+    extras = document.front_matter.extras
+    assert extras == {"tags": ("docs",), "meta": {"owner": "docs"}}
+
+    tags = extras["tags"]
+    assert isinstance(tags, tuple)
 
 
 def test_parse_markdown_document_leaves_non_front_matter_preamble_untouched() -> None:
