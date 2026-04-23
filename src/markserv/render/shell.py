@@ -84,56 +84,45 @@ _THEME_BUTTONS = (
 )
 
 
-def _theme_buttons() -> tuple[ComponentType, ...]:
-    return tuple(
-        html.button(
-            SafeStr(icon),
-            type="button",
-            class_="theme-btn hit-area-1",
-            data_theme_btn=value,
-            aria_label=f"{label} theme",
-            title=label,
-        )
+def _html_attrs(attrs: dict[str, str]) -> str:
+    return "".join(f' {name.replace("_", "-")}="{html_escape(value, quote=True)}"' for name, value in attrs.items())
+
+
+def _theme_buttons_html() -> str:
+    return "".join(
+        f'<button type="button" class="theme-btn hit-area-1" data-theme-btn="{value}"'
+        f' aria-label="{html_escape(f"{label} theme", quote=True)}" title="{html_escape(label, quote=True)}">'
+        f"{icon}</button>"
         for value, label, icon in _THEME_BUTTONS
     )
 
 
 def theme_picker() -> ComponentType:
-    return html.div(*_theme_buttons(), class_="theme-picker")
+    return SafeStr(f'<div class="theme-picker">{_theme_buttons_html()}</div>')
 
 
 def floating_theme_picker() -> ComponentType:
-    return html.div(*_theme_buttons(), html.span(class_="theme-label"), class_="floating-theme-picker")
+    return SafeStr(f'<div class="floating-theme-picker">{_theme_buttons_html()}<span class="theme-label"></span></div>')
 
 
 def _sidebar_toggle() -> ComponentType:
-    return Fragment(
-        html.input_(
-            type="checkbox",
-            id="sidebar-collapsed-toggle",
-            class_="sidebar-collapse-toggle",
-            hx_preserve="",
-            aria_hidden="true",
-            tabindex="-1",
-        ),
-        html.label(
-            html.span(SafeStr(_ICON_SIDEBAR_CLOSE), class_="sidebar-icon-close"),
-            html.span(SafeStr(_ICON_SIDEBAR_OPEN), class_="sidebar-icon-open"),
-            for_="sidebar-collapsed-toggle",
-            class_="sidebar-toggle hit-area-2",
-            aria_label="Toggle sidebar",
-            title="Toggle sidebar",
-        ),
+    return SafeStr(
+        '<input type="checkbox" id="sidebar-collapsed-toggle" class="sidebar-collapse-toggle"'
+        ' hx-preserve="" aria-hidden="true" tabindex="-1"/>'
+        '<label for="sidebar-collapsed-toggle" class="sidebar-toggle hit-area-2"'
+        ' aria-label="Toggle sidebar" title="Toggle sidebar">'
+        f"{_ICON_SIDEBAR_CLOSE}{_ICON_SIDEBAR_OPEN}"
+        "</label>"
     )
 
 
 def _sidebar_state_form(sidebar: SidebarView) -> ComponentType:
-    inputs: list[ComponentType] = []
+    inputs: list[str] = []
     if sidebar.navigation.explicit:
-        inputs.append(html.input_(type="hidden", name=NAV_STATE_QUERY_PARAM, value="1"))
+        inputs.append(f'<input type="hidden" name="{NAV_STATE_QUERY_PARAM}" value="1"/>')
     for path in sidebar.navigation.open_paths:
-        inputs.append(html.input_(type="hidden", name=NAV_QUERY_PARAM, value=path))
-    return html.form(*inputs, id=SIDEBAR_STATE_FORM_ID, class_="sidebar-state")
+        inputs.append(f'<input type="hidden" name="{NAV_QUERY_PARAM}" value="{html_escape(path, quote=True)}"/>')
+    return SafeStr(f'<form id="{SIDEBAR_STATE_FORM_ID}" class="sidebar-state">{"".join(inputs)}</form>')
 
 
 def sidebar_shell(view: DocsPageView, *, oob: bool = False) -> ComponentType:
@@ -141,101 +130,82 @@ def sidebar_shell(view: DocsPageView, *, oob: bool = False) -> ComponentType:
     if sidebar is None:
         return Fragment()
 
-    title: ComponentType
+    title_html: str
     if sidebar.home_href is not None:
-        title = html.a(
-            sidebar.config_name, href=sidebar.home_href, class_="sidebar-title", **htmx_nav_attrs(sidebar.home_href)
+        title_html = (
+            f'<a href="{html_escape(sidebar.home_href, quote=True)}" class="sidebar-title"'
+            f"{_html_attrs(htmx_nav_attrs(sidebar.home_href))}>"
+            f"{html_escape(sidebar.config_name)}</a>"
         )
     else:
-        title = html.span(sidebar.config_name, class_="sidebar-title")
+        title_html = f'<span class="sidebar-title">{html_escape(sidebar.config_name)}</span>'
 
-    attrs: dict[str, str] = {"id": "sidebar-shell", "class_": "sidebar"}
+    aside_attrs = {"id": "sidebar-shell", "class_": "sidebar"}
     if oob:
-        attrs["hx_swap_oob"] = "outerHTML"
+        aside_attrs["hx_swap_oob"] = "outerHTML"
 
-    return html.aside(
-        _sidebar_state_form(sidebar),
-        html.div(
-            html.div(title, class_="sidebar-header"),
-            html.div(
-                html.div(
-                    html.span(sidebar.root_dir, class_="sidebar-path-text"),
-                    html.button(
-                        SafeStr(_ICON_CLIPBOARD),
-                        SafeStr(_ICON_CLIPBOARD_CHECK),
-                        type="button",
-                        class_="copy-btn copy-btn-sm hit-area-1",
-                        data_copy_text=sidebar.root_dir,
-                        aria_label="Copy path",
-                        title="Copy path",
-                    ),
-                    class_="content-path-group",
-                ),
-                class_="sidebar-path",
-            ),
-            class_="sidebar-top",
-        ),
-        render_nav_items(
-            sidebar.items,
-            view.rel_path,
-            sidebar.navigation.open_paths,
-            nav_state_explicit=sidebar.navigation.explicit,
-        ),
-        html.div(theme_picker(), class_="sidebar-footer"),
-        **attrs,
+    nav_html = render_nav_items(
+        sidebar.items,
+        view.rel_path,
+        sidebar.navigation.open_paths,
+        nav_state_explicit=sidebar.navigation.explicit,
+    )
+    return SafeStr(
+        f"<aside{_html_attrs(aside_attrs)}>"
+        f"{_sidebar_state_form(sidebar)}"
+        '<div class="sidebar-top">'
+        f'<div class="sidebar-header">{title_html}</div>'
+        '<div class="sidebar-path"><div class="content-path-group">'
+        f'<span class="sidebar-path-text">{html_escape(sidebar.root_dir)}</span>'
+        '<button type="button" class="copy-btn copy-btn-sm hit-area-1"'
+        f' data-copy-text="{html_escape(sidebar.root_dir, quote=True)}"'
+        ' aria-label="Copy path" title="Copy path">'
+        f"{_ICON_CLIPBOARD}{_ICON_CLIPBOARD_CHECK}</button>"
+        "</div></div>"
+        "</div>"
+        f"{nav_html}"
+        f'<div class="sidebar-footer">{theme_picker()}</div>'
+        "</aside>"
     )
 
 
 def main_shell(view: DocsPageView) -> ComponentType:
-    return html.main(
-        html.div(
-            html.div(
-                html.span(view.rel_path, class_="content-path"),
-                html.button(
-                    SafeStr(_ICON_CLIPBOARD),
-                    SafeStr(_ICON_CLIPBOARD_CHECK),
-                    type="button",
-                    class_="copy-btn hit-area-1",
-                    data_copy_text=view.rel_path,
-                    aria_label="Copy file path",
-                    title="Copy file path",
-                ),
-                class_="content-path-group",
-            ),
-            class_="content-header",
-        ),
-        html.div(html.article(SafeStr(view.rendered_markdown), class_="markdown-body"), class_="markdown-frame"),
-        id=MAIN_SHELL_ID,
-        class_="main",
-        data_icon=icon_href(view.rel_path),
+    return SafeStr(
+        f'<main id="{MAIN_SHELL_ID}" class="main" data-icon="{html_escape(icon_href(view.rel_path), quote=True)}">'
+        '<div class="content-header"><div class="content-path-group">'
+        f'<span class="content-path">{html_escape(view.rel_path)}</span>'
+        '<button type="button" class="copy-btn hit-area-1"'
+        f' data-copy-text="{html_escape(view.rel_path, quote=True)}"'
+        ' aria-label="Copy file path" title="Copy file path">'
+        f"{_ICON_CLIPBOARD}{_ICON_CLIPBOARD_CHECK}</button>"
+        "</div></div>"
+        f'<div class="markdown-frame"><article class="markdown-body">{view.rendered_markdown}</article></div>'
+        "</main>"
     )
 
 
 def docs_shell(view: DocsPageView) -> ComponentType:
-    sidebar_frame: ComponentType = Fragment()
-    theme_float: ComponentType = Fragment()
-    sidebar_toggle: ComponentType = Fragment()
     has_sidebar = view.sidebar is not None
-    if not has_sidebar:
-        theme_float = floating_theme_picker()
+    sidebar_toggle_html = ""
+    sidebar_frame_html = ""
+    theme_float_html = ""
     if has_sidebar:
-        sidebar_toggle = _sidebar_toggle()
-        sidebar_frame = html.div(
-            sidebar_shell(view),
-            html.div(class_="sidebar-resize hit-area-x-2", aria_hidden="true"),
-            class_="sidebar-frame",
+        sidebar_toggle_html = str(_sidebar_toggle())
+        sidebar_frame_html = (
+            '<div class="sidebar-frame">'
+            f"{sidebar_shell(view)}"
+            '<div class="sidebar-resize hit-area-x-2" aria-hidden="true"></div>'
+            "</div>"
         )
+    else:
+        theme_float_html = str(floating_theme_picker())
 
     shell_class = "app-shell with-sidebar" if has_sidebar else "app-shell"
-    return html.div(
-        sidebar_toggle,
-        sidebar_frame,
-        theme_float,
-        main_shell(view),
-        id="page-shell",
-        class_=shell_class,
-        data_icon=icon_href(view.rel_path),
-        hx_history_elt="",
+    return SafeStr(
+        f'<div id="page-shell" class="{shell_class}"'
+        f' data-icon="{html_escape(icon_href(view.rel_path), quote=True)}" hx-history-elt="">'
+        f"{sidebar_toggle_html}{sidebar_frame_html}{theme_float_html}{main_shell(view)}"
+        "</div>"
     )
 
 

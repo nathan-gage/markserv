@@ -32,8 +32,9 @@ def test_demo_site_renders_without_filesystem_fixture() -> None:
         assert home_response.status_code == 200
         assert "Demo Home · markserv" in home_response.text
         assert ">Welcome<" in home_response.text
-        assert ">Start Here<" in home_response.text
-        assert ">project overview<" in home_response.text
+        assert "guides</span>" in home_response.text
+        assert ">Start Here<" not in home_response.text
+        assert 'class="nav-link">project overview<' not in home_response.text
         assert ">Hidden page<" not in home_response.text
 
         overview_response = client.get("/docs/guides/project-overview.md")
@@ -74,7 +75,10 @@ def test_demo_front_matter_controls_labels_and_ordering() -> None:
     assert hidden_page is not None and hidden_page.hidden is True
 
     with TestClient(create_app(site)) as client:
-        response = client.get("/docs/guides/project-overview.md")
+        response = client.get(
+            "/docs/guides/project-overview.md",
+            params=[("nav_state", "1"), ("nav", "guides"), ("nav", "guides/features")],
+        )
         assert response.status_code == 200
         assert response.text.index(">Start Here<") < response.text.index(">project overview<")
         assert response.text.index(">Front matter<") < response.text.index(">GFM examples<")

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Sequence
+from functools import lru_cache
 from html import escape as html_escape
 from pathlib import Path
 from urllib.parse import parse_qsl, quote, unquote, urlencode, urljoin, urlsplit, urlunsplit
@@ -51,17 +52,29 @@ def with_nav_open_paths(
     return urlunsplit((split.scheme, split.netloc, split.path, _encode_query_pairs(query_pairs), split.fragment))
 
 
+@lru_cache(maxsize=4096)
+def _quoted_path(path: str) -> str:
+    return quote(path, safe="/")
+
+
 def docs_href(
     rel_path: str,
     nav_open_paths: Sequence[str] = (),
     *,
     nav_state_explicit: bool = False,
 ) -> str:
-    return with_nav_open_paths(
-        f"/docs/{quote(rel_path, safe='/')}",
-        nav_open_paths,
-        nav_state_explicit=nav_state_explicit,
+    path = f"/docs/{_quoted_path(rel_path)}"
+    if not nav_state_explicit:
+        return path
+    if not nav_open_paths:
+        return f"{path}?{NAV_STATE_QUERY_PARAM}=1&{NAV_QUERY_PARAM}="
+    query = "&".join(
+        [
+            f"{NAV_STATE_QUERY_PARAM}=1",
+            *(f"{NAV_QUERY_PARAM}={_quoted_path(nav_path)}" for nav_path in nav_open_paths),
+        ]
     )
+    return f"{path}?{query}"
 
 
 def public_asset_href(rel_path: str) -> str:

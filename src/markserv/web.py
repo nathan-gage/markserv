@@ -143,6 +143,7 @@ def nav_state_from_request(
 
 async def resolve_docs_response(
     site: SiteSource,
+    runtime: SiteRuntime,
     page_index: PageIndex,
     requested_path: str,
     *,
@@ -161,9 +162,13 @@ async def resolve_docs_response(
             raise HTTPException(status_code=404, detail="Directory contains no markdown files")
         return redirect_response(docs_href(default_doc), htmx=htmx)
 
+    cached_view = runtime.cached_docs_view(rel_path, navigation)
+    if cached_view is not None:
+        return cached_view
+
     markdown_text = await asyncio.to_thread(site.read_markdown, rel_path)
     if markdown_text is not None:
-        return await asyncio.to_thread(
+        view = await asyncio.to_thread(
             build_docs_view,
             site,
             page_index,
@@ -172,6 +177,7 @@ async def resolve_docs_response(
             navigation=navigation,
             dev_reload=dev_reload,
         )
+        return runtime.store_docs_view(view)
 
     asset_path = await asyncio.to_thread(site.resolve_asset, rel_path)
     if asset_path is not None:
@@ -363,20 +369,24 @@ def create_app(config_or_site: ServeConfig | SiteSource) -> FastAPI:
         page_index = await runtime.get_page_index()
         resolved = await resolve_docs_response(
             site,
+            runtime,
             page_index,
             requested_path,
             htmx=is_htmx_request(request),
-            navigation=nav_state_from_request(request, page_index, default_to_all=True),
+            navigation=nav_state_from_request(request, page_index),
             dev_reload=runtime.dev_reload,
         )
         if isinstance(resolved, Response):
             return resolved
 
         if is_htmx_request(request) and request.headers.get("hx-target") == "sidebar-shell":
-            return HTMLResponse(
-                await runtime.renderer.render_component(render_sidebar_fragment(resolved), request),
-                headers=NO_CACHE_HEADERS,
-            )
+            cached_sidebar_html = runtime.cached_sidebar_fragment(resolved)
+            if cached_sidebar_html is not None:
+                return HTMLResponse(cached_sidebar_html, headers=NO_CACHE_HEADERS)
+
+            sidebar_html = await runtime.renderer.render_component(render_sidebar_fragment(resolved), request)
+            runtime.store_sidebar_fragment(resolved, sidebar_html)
+            return HTMLResponse(sidebar_html, headers=NO_CACHE_HEADERS)
 
         return await render_view_response(
             request,

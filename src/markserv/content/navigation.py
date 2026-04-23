@@ -26,48 +26,51 @@ def build_nav_tree(pages: Iterable[MarkdownPage]) -> NavTree:
     return root
 
 
-def build_nav_nodes(
-    tree: NavTree,
-    current_rel: str,
-    prefix: str = "",
-    *,
-    open_paths: frozenset[str] = frozenset(),
-    nav_state_explicit: bool = False,
-) -> tuple[NavNode, ...]:
+def build_nav_items(pages: tuple[MarkdownPage, ...]) -> tuple[NavNode, ...]:
+    return _build_nav_items(build_nav_tree(pages))
+
+
+def _build_nav_items(tree: NavTree, prefix: str = "") -> tuple[NavNode, ...]:
     directories: list[tuple[str, NavTree]] = []
-    files_only: list[MarkdownPage] = []
+    files: list[MarkdownPage] = []
 
     for name, child in tree.items():
         if isinstance(child, MarkdownPage):
-            files_only.append(child)
+            files.append(child)
         else:
             directories.append((name, child))
 
-    items: list[NavNode] = []
-    for directory_name, child_tree in sorted(directories, key=lambda item: item[0].lower()):
-        rel_dir = f"{prefix}/{directory_name}" if prefix else directory_name
-        items.append(
-            NavDirectory(
-                name=directory_name,
-                path=rel_dir,
-                open=rel_dir in open_paths or (not nav_state_explicit and current_rel.startswith(f"{rel_dir}/")),
-                children=build_nav_nodes(
-                    child_tree,
-                    current_rel,
-                    rel_dir,
-                    open_paths=open_paths,
-                    nav_state_explicit=nav_state_explicit,
-                ),
-            )
-        )
+    directory_items = tuple(
+        _build_nav_directory(directory_name, child_tree, prefix)
+        for directory_name, child_tree in sorted(directories, key=lambda item: item[0].lower())
+    )
+    file_items = tuple(
+        NavFile(label=page.label, href=f"/docs/{quote(page.rel_path, safe='/')}", rel_path=page.rel_path)
+        for page in sorted(files, key=sort_markdown_page)
+    )
+    return (*directory_items, *file_items)
 
-    for page in sorted(files_only, key=sort_markdown_page):
-        items.append(
-            NavFile(
-                label=page.label,
-                href=f"/docs/{quote(page.rel_path, safe='/')}",
-                active=page.rel_path == current_rel,
-            )
-        )
 
-    return tuple(items)
+def _build_nav_directory(directory_name: str, child_tree: NavTree, prefix: str) -> NavDirectory:
+    rel_dir = f"{prefix}/{directory_name}" if prefix else directory_name
+    directories: list[tuple[str, NavTree]] = []
+    files: list[MarkdownPage] = []
+
+    for name, child in child_tree.items():
+        if isinstance(child, MarkdownPage):
+            files.append(child)
+        else:
+            directories.append((name, child))
+
+    return NavDirectory(
+        name=directory_name,
+        path=rel_dir,
+        files=tuple(
+            NavFile(label=page.label, href=f"/docs/{quote(page.rel_path, safe='/')}", rel_path=page.rel_path)
+            for page in sorted(files, key=sort_markdown_page)
+        ),
+        directories=tuple(
+            _build_nav_directory(name, tree, rel_dir)
+            for name, tree in sorted(directories, key=lambda item: item[0].lower())
+        ),
+    )
