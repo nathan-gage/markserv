@@ -4,7 +4,7 @@ import re
 from dataclasses import dataclass
 from urllib.parse import quote
 
-from .site import MarkdownPage, PageIndex, SiteSource, humanize_name
+from .content import MarkdownPage, PageIndex, SiteSource, humanize_name
 
 ATX_HEADING_RE = re.compile(r"^\s{0,3}(#{1,6})\s+(.*?)(?:\s+#+\s*)?$")
 FENCE_RE = re.compile(r"^\s{0,3}(`{3,}|~{3,})")

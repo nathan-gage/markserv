@@ -7,20 +7,24 @@ import select
 import sys
 import threading
 import webbrowser
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from pathlib import Path
-from typing import Annotated, Any, Protocol
+from typing import Annotated, Protocol
 
 import uvicorn
 from cyclopts import App, Parameter
 from cyclopts.help import PlainFormatter
 from cyclopts.token import Token
+from fastapi import FastAPI
 from rich.console import Console
 from rich.logging import RichHandler
 from uvicorn import Config, Server
 
 from .app import create_app
-from .site import build_config, build_file_site
+from .content import build_config, build_file_site
+from .settings import PYTHON_RELOAD_ENV_VAR as _PYTHON_RELOAD_ENV_VAR
+from .settings import TARGET_ENV_VAR as _TARGET_ENV_VAR
+from .settings import python_reload_enabled, target_from_env
 
 
 class StoppableServer(Protocol):
@@ -34,8 +38,8 @@ console = Console(stderr=True)
 QUIT_KEYS = {"q", "Q", "\x1b"}
 DEFAULT_HOST = "localhost"
 DEFAULT_PORT = 4422
-PYTHON_RELOAD_ENV_VAR = "MARKSERV_PYTHON_RELOAD"
-TARGET_ENV_VAR = "MARKSERV_TARGET"
+PYTHON_RELOAD_ENV_VAR = _PYTHON_RELOAD_ENV_VAR
+TARGET_ENV_VAR = _TARGET_ENV_VAR
 PYTHON_RELOAD_DIR = Path(__file__).resolve().parent
 SHUTDOWN_GRACE_SECONDS = 1
 
@@ -47,7 +51,7 @@ app = App(
 )
 
 
-def _validate_target(_type_: Any, tokens: tuple[Token, ...]) -> Path:
+def _validate_target(_type_: object, tokens: tuple[Token, ...]) -> Path:
     raw_path = Path(tokens[0].value)
     build_config(raw_path)
     return raw_path
@@ -76,13 +80,8 @@ def browser_url(host: str, port: int) -> str:
     return f"http://{public_host}:{port}"
 
 
-def python_reload_enabled() -> bool:
-    value = os.environ.get(PYTHON_RELOAD_ENV_VAR, "")
-    return value.lower() in {"1", "true", "yes", "on"}
-
-
 @contextlib.contextmanager
-def temporary_env(updates: Mapping[str, str]) -> Any:
+def temporary_env(updates: Mapping[str, str]) -> Iterator[None]:
     previous = {key: os.environ.get(key) for key in updates}
     os.environ.update(updates)
     try:
@@ -104,7 +103,7 @@ def print_startup_banner(*, source: str, root_dir: str, url: str, open_browser: 
         else "Press Ctrl+C to quit."
     )
     browser_hint = "Browser opens automatically." if open_browser else "Browser auto-open disabled."
-    reload_hint = "Python reload enabled via MARKSERV_PYTHON_RELOAD." if python_reload else None
+    reload_hint = f"Python reload enabled via {PYTHON_RELOAD_ENV_VAR}." if python_reload else None
     display_url = url.removeprefix("http://")
 
     console.print(f"[bold cyan]markserv[/] serving {source}")
@@ -116,7 +115,7 @@ def print_startup_banner(*, source: str, root_dir: str, url: str, open_browser: 
     console.print(f"[dim]{quit_hint}[/]")
 
 
-def create_server(app: Any, *, host: str, port: int) -> Server:
+def create_server(app: FastAPI, *, host: str, port: int) -> Server:
     return Server(
         Config(
             app,
@@ -201,7 +200,7 @@ def run_server(server: StoppableServer) -> None:
 
 
 def serve_application(
-    application: Any | None,
+    application: FastAPI | None,
     *,
     source: str,
     root_dir: str,
@@ -272,11 +271,11 @@ def serve(
     )
 
 
-def create_app_from_env() -> Any:
-    target = os.environ.get(TARGET_ENV_VAR)
-    if not target:
+def create_app_from_env() -> FastAPI:
+    target = target_from_env()
+    if target is None:
         raise RuntimeError(f"{TARGET_ENV_VAR} must be set when Python reload is enabled")
-    config = build_config(Path(target))
+    config = build_config(target)
     return create_app(build_file_site(config))
 
 

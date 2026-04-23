@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 from html import escape, unescape
+from types import MappingProxyType
 from typing import cast
 
 import cmarkgfm
@@ -30,6 +32,10 @@ NON_SLUG_RE = re.compile(r"[^\w\- ]+", re.UNICODE)
 PYGMENTS_HTML_FORMATTER = HtmlFormatter(nowrap=True)
 TRUE_VALUES = {"1", "true", "yes", "on"}
 FALSE_VALUES = {"0", "false", "no", "off"}
+FRONT_MATTER_RESERVED_KEYS = frozenset(
+    {"title", "nav_label", "sidebar_label", "label", "nav_order", "order", "hidden", "nav_hidden"}
+)
+EMPTY_FRONT_MATTER_EXTRAS: Mapping[str, object] = MappingProxyType({})
 ANCHOR_ICON_SVG = (
     '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" '
     'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" '
@@ -46,12 +52,13 @@ class MarkdownFrontMatter:
     nav_label: str | None = None
     nav_order: float | None = None
     hidden: bool = False
+    extras: Mapping[str, object] = field(default_factory=lambda: EMPTY_FRONT_MATTER_EXTRAS, hash=False)
 
 
 @dataclass(frozen=True)
 class MarkdownDocument:
     body: str
-    front_matter: MarkdownFrontMatter = MarkdownFrontMatter()
+    front_matter: MarkdownFrontMatter = field(default_factory=MarkdownFrontMatter)
 
 
 def parse_markdown_document(markdown_text: str) -> MarkdownDocument:
@@ -102,12 +109,16 @@ def _front_matter_from_mapping(data: dict[str, object]) -> MarkdownFrontMatter:
     nav_label_value = data.get("nav_label", data.get("sidebar_label", data.get("label")))
     nav_order_value = data.get("nav_order", data.get("order"))
     hidden_value = data["hidden"] if "hidden" in data else data.get("nav_hidden")
+    extras = MappingProxyType(
+        {key: _freeze_front_matter_value(value) for key, value in data.items() if key not in FRONT_MATTER_RESERVED_KEYS}
+    )
 
     return MarkdownFrontMatter(
         title=_string_value(data.get("title")),
         nav_label=_string_value(nav_label_value),
         nav_order=_float_value(nav_order_value),
         hidden=_bool_value(hidden_value),
+        extras=extras or EMPTY_FRONT_MATTER_EXTRAS,
     )
 
 
@@ -141,6 +152,14 @@ def _bool_value(value: object) -> bool:
         if lowered in FALSE_VALUES:
             return False
     return False
+
+
+def _freeze_front_matter_value(value: object) -> object:
+    if isinstance(value, list):
+        return tuple(_freeze_front_matter_value(item) for item in value)
+    if isinstance(value, dict):
+        return MappingProxyType({key: _freeze_front_matter_value(item) for key, item in value.items()})
+    return value
 
 
 def _highlight_code_blocks(rendered_html: str) -> str:
