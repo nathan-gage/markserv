@@ -698,8 +698,13 @@ html.theme-view-transition.theme-view-to-dark::view-transition-new(root) {
 }
 
 .sidebar-collapse-toggle:checked ~ .floating-theme-picker {
+  visibility: visible;
   opacity: 0.5;
   pointer-events: auto;
+}
+
+.sidebar-collapse-toggle:checked ~ .floating-theme-picker:hover {
+  opacity: 1;
 }
 
 .sidebar-collapse-toggle:checked ~ .main .content-header {
@@ -1075,6 +1080,7 @@ a.sidebar-title:hover {
 }
 
 .app-shell.with-sidebar .floating-theme-picker {
+  visibility: hidden;
   opacity: 0;
   pointer-events: none;
 }
@@ -1193,6 +1199,7 @@ a.sidebar-title:hover {
   }
 
   .app-shell.with-sidebar .floating-theme-picker {
+    visibility: visible;
     opacity: 0.5;
     pointer-events: auto;
   }
