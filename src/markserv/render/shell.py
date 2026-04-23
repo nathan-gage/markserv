@@ -116,7 +116,7 @@ def _sidebar_toggle() -> ComponentType:
         ' aria-label="Toggle sidebar" title="Toggle sidebar">'
         f'<span class="sidebar-icon-close">{_ICON_SIDEBAR_CLOSE}</span>'
         f'<span class="sidebar-icon-open">{_ICON_SIDEBAR_OPEN}</span>'
-        '</label>'
+        "</label>"
     )
 
 
