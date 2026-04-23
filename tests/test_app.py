@@ -149,6 +149,11 @@ def test_directory_mode_redirects_to_readme_and_hides_gitignored_files(tmp_path:
         assert 'data-theme-btn="system"' in page_response.text
         assert 'data-theme-btn="light"' in page_response.text
         assert 'data-theme-btn="dark"' in page_response.text
+        assert 'class="floating-theme-picker"' in page_response.text
+        assert 'class="sidebar-icon-close"' in page_response.text
+        assert 'class="sidebar-icon-open"' in page_response.text
+        assert 'class="sidebar"' in page_response.text
+        assert 'class-="sidebar"' not in page_response.text
         assert "hit-area-1" in page_response.text
         assert "/public/js/sidebar.js" in page_response.text
         assert "/public/vendor/htmx.min.js" in page_response.text
@@ -165,6 +170,7 @@ def test_directory_mode_redirects_to_readme_and_hides_gitignored_files(tmp_path:
         assert fragment_response.status_code == 200
         assert 'id="main-shell"' in fragment_response.text
         assert 'id="sidebar-shell"' in fragment_response.text
+        assert 'class="sidebar"' in fragment_response.text
         assert 'hx-swap-oob="true"' in fragment_response.text
         assert 'id="favicon"' in fragment_response.text
         assert 'hx-swap-oob="outerHTML"' in fragment_response.text

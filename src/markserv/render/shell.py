@@ -85,7 +85,10 @@ _THEME_BUTTONS = (
 
 
 def _html_attrs(attrs: dict[str, str]) -> str:
-    return "".join(f' {name.replace("_", "-")}="{html_escape(value, quote=True)}"' for name, value in attrs.items())
+    return "".join(
+        f' {name.removesuffix("_").replace("_", "-")}="{html_escape(value, quote=True)}"'
+        for name, value in attrs.items()
+    )
 
 
 def _theme_buttons_html() -> str:
@@ -111,8 +114,9 @@ def _sidebar_toggle() -> ComponentType:
         ' hx-preserve="" aria-hidden="true" tabindex="-1"/>'
         '<label for="sidebar-collapsed-toggle" class="sidebar-toggle hit-area-2"'
         ' aria-label="Toggle sidebar" title="Toggle sidebar">'
-        f"{_ICON_SIDEBAR_CLOSE}{_ICON_SIDEBAR_OPEN}"
-        "</label>"
+        f'<span class="sidebar-icon-close">{_ICON_SIDEBAR_CLOSE}</span>'
+        f'<span class="sidebar-icon-open">{_ICON_SIDEBAR_OPEN}</span>'
+        '</label>'
     )
 
 
@@ -188,7 +192,7 @@ def docs_shell(view: DocsPageView) -> ComponentType:
     has_sidebar = view.sidebar is not None
     sidebar_toggle_html = ""
     sidebar_frame_html = ""
-    theme_float_html = ""
+    theme_float_html = str(floating_theme_picker())
     if has_sidebar:
         sidebar_toggle_html = str(_sidebar_toggle())
         sidebar_frame_html = (
@@ -197,8 +201,6 @@ def docs_shell(view: DocsPageView) -> ComponentType:
             '<div class="sidebar-resize hit-area-x-2" aria-hidden="true"></div>'
             "</div>"
         )
-    else:
-        theme_float_html = str(floating_theme_picker())
 
     shell_class = "app-shell with-sidebar" if has_sidebar else "app-shell"
     return SafeStr(
