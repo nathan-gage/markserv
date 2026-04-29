@@ -1,0 +1,13 @@
+{
+  "name": "markserv-assets",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "update:mermaid": "npm install mermaid@latest && npm run vendor:mermaid",
+    "vendor": "npm run vendor:mermaid",
+    "vendor:mermaid": "node scripts/vendor-mermaid.mjs"
+  },
+  "dependencies": {
+    "mermaid": "11.14.0"
+  }
+}

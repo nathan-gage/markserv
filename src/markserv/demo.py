@@ -22,13 +22,14 @@ nav_order: 1
 
 Welcome to the built-in demo site.
 
-This sample tree exists so you can quickly try the renderer, sidebar navigation, live reload, Cmd/Ctrl+K search, theme control, and YAML front matter support.
+This sample tree exists so you can quickly try the renderer, sidebar navigation, live reload, Cmd/Ctrl+K search, Mermaid diagrams, theme control, and YAML front matter support.
 
 ## Try these pages
 
 - [Project overview](guides/project-overview.md)
 - [Quickstart](guides/quickstart.md)
 - [YAML front matter demo](guides/features/front-matter.md)
+- [Mermaid diagram gallery](guides/features/mermaid.md)
 - [GitHub-flavored markdown examples](guides/features/gfm.md)
 - [Nested navigation](guides/nested/deep-dive.md)
 - [Reference notes](reference/notes.md)
@@ -50,12 +51,13 @@ This sample tree exists so you can quickly try the renderer, sidebar navigation,
 
 markserv turns a Markdown file or docs folder into a clean local site for READMEs, notes, and lightweight project docs.
 
-It supports GitHub-flavored markdown, syntax highlighting, heading anchors, live reload, sidebar navigation, and theme switching out of the box.
+It supports GitHub-flavored markdown, syntax highlighting, Mermaid diagrams, heading anchors, live reload, sidebar navigation, and theme switching out of the box.
 
 ## Included
 
 - [x] GitHub-flavored Markdown
 - [x] Syntax-highlighted fenced code blocks
+- [x] Mermaid diagrams
 - [x] Automatic heading anchors
 - [x] Sidebar navigation for docs folders
 - [x] System, light, and dark themes
@@ -121,6 +123,65 @@ print(root.resolve())
 | Theme picker | Ready |
 
 Continue to the [front matter demo](features/front-matter.md).
+""",
+    "guides/features/mermaid.md": """---
+title: Mermaid Diagrams
+nav_label: Mermaid diagrams
+nav_order: 15
+---
+
+# Mermaid diagrams
+
+Mermaid fences render as live SVG diagrams that follow the selected markserv theme.
+
+## Local preview pipeline
+
+```mermaid
+flowchart LR
+  classDef source fill:#dbeafe,stroke:#2563eb,color:#172554
+  classDef server fill:#dcfce7,stroke:#16a34a,color:#052e16
+  classDef browser fill:#fef3c7,stroke:#d97706,color:#451a03
+  classDef accent fill:#fae8ff,stroke:#c026d3,color:#4a044e
+
+  A[Markdown docs]:::source --> B[cmarkgfm render]:::server
+  B --> C{Fence type?}:::accent
+  C -->|code| D[Pygments highlight]:::server
+  C -->|mermaid| E[Diagram block]:::accent
+  D --> F[markserv page]:::browser
+  E --> F
+  F --> G[HTMX navigation]:::browser
+  G --> H[Theme-aware SVG render]:::accent
+```
+
+## Navigation lifecycle
+
+```mermaid
+sequenceDiagram
+  participant Writer
+  participant markserv
+  participant Browser
+  participant Mermaid
+
+  Writer->>markserv: Save docs/guide.md
+  markserv-->>Browser: Live reload event
+  Browser->>markserv: Request refreshed page
+  markserv-->>Browser: HTML with .mermaid blocks
+  Browser->>Mermaid: Render visible diagrams
+  Mermaid-->>Browser: Responsive SVG output
+```
+
+## Feature path
+
+```mermaid
+timeline
+  title markserv document path
+  Markdown input : GFM parsing : front matter metadata
+  Render pass : syntax highlighting : heading anchors : Mermaid blocks
+  Browser shell : sidebar navigation : search : theme controls
+  Live preview : file watch events : HTMX swaps : diagram refresh
+```
+
+Back to the [demo home](../../README.md).
 """,
     "guides/features/front-matter.md": """---
 title: YAML front matter

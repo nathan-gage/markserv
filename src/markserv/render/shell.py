@@ -379,6 +379,7 @@ def base_document(
                 html.script(src=public_asset_href("js/favicon.js"), defer=True),
                 html.script(src=public_asset_href("js/live-reload.js"), defer=True),
                 html.script(src=public_asset_href("js/search.js"), defer=True),
+                html.script(type="module", src=public_asset_href("js/mermaid.js")),
                 html.script(src=public_asset_href("js/dev-reload.js"), defer=True) if dev_reload else Fragment(),
             ),
             html.body(search_chrome(), body_content, html.script(src=public_asset_href("vendor/htmx.min.js"))),

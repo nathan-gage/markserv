@@ -73,7 +73,15 @@ default-groups = ["dev", "lint"]
 packages = ["src/markserv"]
 
 [tool.hatch.build.targets.sdist]
-include = ["/src", "/README.md", "/LICENSE", "/pyproject.toml"]
+include = [
+  "/src",
+  "/README.md",
+  "/LICENSE",
+  "/pyproject.toml",
+  "/package.json",
+  "/package-lock.json",
+  "/scripts",
+]
 
 [tool.ruff]
 line-length = 120

@@ -6,7 +6,7 @@
 
 `markserv` opens local Markdown files and docs folders in your browser as a lightweight live-preview web app.
 
-Point it at a README, notes directory, or docs tree and you get a clean GitHub-style reading view with live reload, sidebar navigation, heading anchors, syntax highlighting, and theme switching.
+Point it at a README, notes directory, or docs tree and you get a clean GitHub-style reading view with live reload, sidebar navigation, heading anchors, syntax highlighting, Mermaid diagrams, and theme switching.
 
 ![markserv screenshot](https://raw.githubusercontent.com/nathan-gage/markserv/main/.github/assets/readme-screenshot.png)
 
@@ -18,6 +18,7 @@ Point it at a README, notes directory, or docs tree and you get a clean GitHub-s
 - Sidebar navigation for directory-based docs
 - Automatic heading anchors for deep-linking
 - Syntax highlighting for fenced code blocks
+- Mermaid diagram rendering for `mermaid` fenced code blocks
 - YAML front matter for titles and nav metadata
 - Safer asset serving defaults for linked local files
 - System, light, and dark theme support with saved preference
@@ -71,6 +72,7 @@ markserv.demo
 - In directory mode, shows a sidebar for browsing multiple Markdown pages
 - Adds heading anchors automatically for easy deep-linking
 - Syntax-highlights fenced code blocks
+- Renders Mermaid diagrams from `mermaid` fenced code blocks
 - Supports YAML front matter for page titles and navigation labels/order
 - Remembers your theme choice in browser storage
 
@@ -105,6 +107,7 @@ hidden: false
 - [`FastHX`](https://github.com/volfpeter/fasthx) for HTMX-aware FastAPI rendering
 - [`htmy`](https://github.com/volfpeter/htmy) for Python component-based HTML rendering
 - [`github-markdown-css`](https://github.com/sindresorhus/github-markdown-css) for GitHub-like styling
+- [`Mermaid`](https://mermaid.js.org/) for diagram rendering
 - [`watchfiles`](https://github.com/samuelcolvin/watchfiles) for live reload
 - [`ignoretree`](https://pypi.org/project/ignoretree/) to respect `.gitignore` rules while scanning
 
@@ -126,6 +129,9 @@ Common commands:
 | Type-check | `make typecheck` |
 | Test | `make test` |
 | Run the full local CI suite | `make all-ci` |
+| Install optional asset update tooling | `make install-assets` |
+| Refresh vendored frontend assets | `make vendor-assets` |
+| Update Mermaid and refresh the vendored asset | `make update-mermaid` |
 
 ## Notes
 
@@ -133,6 +139,9 @@ Common commands:
 - UI components are rendered with `htmy` from Python.
 - Front-end assets live under `src/markserv/public/`.
 - Bundled CSS comes from `github-markdown-css` and generated Pygments themes.
+- Mermaid runtime files are vendored into `src/markserv/public/vendor/` and included in built wheels and sdists.
+- `npm` is only needed by maintainers who are updating the vendored Mermaid files with `make update-mermaid`.
 - Bundled HTMX assets are used for SSE-driven live updates.
 - The upstream stylesheet license is included at `src/markserv/public/licenses/github-markdown-css.LICENSE`.
 - The bundled HTMX license is included at `src/markserv/public/licenses/htmx.LICENSE`.
+- The bundled Mermaid license is included at `src/markserv/public/licenses/mermaid.LICENSE`.
