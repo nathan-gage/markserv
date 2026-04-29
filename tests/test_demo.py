@@ -16,6 +16,7 @@ def test_demo_site_contains_nested_markdown() -> None:
     assert "guides/project-overview.md" in markdown_files
     assert "guides/quickstart.md" in markdown_files
     assert "guides/features/front-matter.md" in markdown_files
+    assert "guides/features/mermaid.md" in markdown_files
     assert "guides/features/gfm.md" in markdown_files
     assert "guides/nested/deep-dive.md" in markdown_files
     assert "reference/notes.md" in markdown_files
@@ -45,6 +46,13 @@ def test_demo_site_renders_without_filesystem_fixture() -> None:
         assert '<pre class="highlight" data-language="yaml">' in overview_response.text
         assert "GitHub-flavored markdown" in overview_response.text
         assert "Project README" in overview_response.text
+
+        mermaid_response = client.get("/docs/guides/features/mermaid.md")
+        assert mermaid_response.status_code == 200
+        assert "Mermaid Diagrams · markserv" in mermaid_response.text
+        assert '<pre class="mermaid">flowchart LR' in mermaid_response.text
+        assert '<pre class="mermaid">sequenceDiagram' in mermaid_response.text
+        assert '<pre class="mermaid">timeline' in mermaid_response.text
 
         page_response = client.get("/docs/guides/features/front-matter.md")
         assert page_response.status_code == 200

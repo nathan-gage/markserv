@@ -481,6 +481,31 @@ html.theme-view-transition.theme-view-to-dark::view-transition-new(root) {
   border-radius: 0.25rem;
 }
 
+.markdown-body pre.mermaid {
+  display: grid;
+  place-items: center;
+  overflow-x: auto;
+  min-height: 12rem;
+  padding: 1.25rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, var(--panel) 92%, var(--link) 8%);
+  color: var(--text);
+  text-align: center;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 8%);
+}
+
+.markdown-body pre.mermaid svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.markdown-body pre.mermaid.mermaid-error {
+  display: block;
+  text-align: left;
+  white-space: pre;
+}
+
 .hit-area,
 .hit-area-1,
 .hit-area-2,

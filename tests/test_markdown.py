@@ -82,3 +82,11 @@ def test_render_markdown_syntax_highlights_fenced_code_blocks() -> None:
     assert '<pre class="highlight" data-language="python">' in rendered
     assert 'class="language-python"' in rendered
     assert '<span class="k">def</span>' in rendered
+
+
+def test_render_markdown_preserves_mermaid_fences_for_client_rendering() -> None:
+    rendered = render_markdown("```mermaid\ngraph TD\n  A[Start] --> B{Done?}\n```\n")
+
+    assert '<pre class="mermaid">graph TD\n  A[Start] --&gt; B{Done?}\n</pre>' in rendered
+    assert 'class="highlight"' not in rendered
+    assert "<code" not in rendered

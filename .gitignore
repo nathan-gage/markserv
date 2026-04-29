@@ -16,3 +16,6 @@ htmlcov/
 
 # Virtual environments
 .venv
+
+# Node frontend dependencies
+node_modules/

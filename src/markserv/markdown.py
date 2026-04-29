@@ -30,6 +30,7 @@ LANG_ATTR_RE = re.compile(r'\slang="([^"]+)"')
 WORD_BREAK_RE = re.compile(r"[\s_]+")
 NON_SLUG_RE = re.compile(r"[^\w\- ]+", re.UNICODE)
 PYGMENTS_HTML_FORMATTER = HtmlFormatter(nowrap=True)
+MERMAID_LANGUAGES = {"mermaid"}
 TRUE_VALUES = {"1", "true", "yes", "on"}
 FALSE_VALUES = {"0", "false", "no", "off"}
 FRONT_MATTER_RESERVED_KEYS = frozenset(
@@ -166,6 +167,11 @@ def _highlight_code_blocks(rendered_html: str) -> str:
     def replace(match: re.Match[str]) -> str:
         raw_pre_attrs = match.group("attrs")
         language = _extract_language(raw_pre_attrs)
+        if _is_mermaid_language(language):
+            pre_attrs = _append_class_attr(_strip_language_attr(raw_pre_attrs), "mermaid")
+            code_text = unescape(match.group("code"))
+            return f"<pre{pre_attrs}>{escape(code_text)}</pre>"
+
         pre_attrs = _append_class_attr(_strip_language_attr(raw_pre_attrs), "highlight")
         if language is not None:
             pre_attrs = _set_attr(pre_attrs, "data-language", language)
@@ -195,6 +201,10 @@ def _extract_language(attrs: str) -> str | None:
 
 def _strip_language_attr(attrs: str) -> str:
     return LANG_ATTR_RE.sub("", attrs)
+
+
+def _is_mermaid_language(language: str | None) -> bool:
+    return language is not None and language.strip().casefold() in MERMAID_LANGUAGES
 
 
 def _lexer_for_language(language: str | None) -> Lexer:

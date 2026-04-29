@@ -146,6 +146,7 @@ def test_directory_mode_redirects_to_readme_and_hides_gitignored_files(tmp_path:
         assert 'id="pygments-dark"' in page_response.text
         assert "/public/js/theme.js" in page_response.text
         assert "/public/js/live-reload.js" in page_response.text
+        assert "/public/js/mermaid.js" in page_response.text
         assert 'data-theme-btn="system"' in page_response.text
         assert 'data-theme-btn="light"' in page_response.text
         assert 'data-theme-btn="dark"' in page_response.text
@@ -184,6 +185,16 @@ def test_directory_mode_redirects_to_readme_and_hides_gitignored_files(tmp_path:
         assert theme_asset_response.status_code == 200
         assert "markserv-theme" in theme_asset_response.text
         assert 'const SYSTEM_THEME = "system"' in theme_asset_response.text
+
+        mermaid_asset_response = client.get("/public/js/mermaid.js")
+        assert mermaid_asset_response.status_code == 200
+        assert "mermaid.run" in mermaid_asset_response.text
+        assert "/public/vendor/mermaid.esm.min.mjs" in mermaid_asset_response.text
+        assert "cdn.jsdelivr.net" not in mermaid_asset_response.text
+
+        mermaid_vendor_response = client.get("/public/vendor/mermaid.esm.min.mjs")
+        assert mermaid_vendor_response.status_code == 200
+        assert "./chunks/mermaid.esm.min/" in mermaid_vendor_response.text
 
         ignored_response = client.get("/docs/.venv/ignored.md")
         assert ignored_response.status_code == 404
@@ -239,6 +250,18 @@ def test_markdown_doc_links_are_htmx_enhanced_without_touching_assets(tmp_path: 
         in response.text
     )
     assert '<a href="diagram.png">Diagram</a>' in response.text
+
+
+def test_mermaid_fences_render_as_client_diagram_blocks(tmp_path: Path) -> None:
+    docs_root = tmp_path / "docs"
+    write_text(docs_root / "README.md", "# Home\n\n```mermaid\ngraph TD\n  A --> B\n```\n")
+
+    with TestClient(create_app(build_config(docs_root))) as client:
+        response = client.get("/docs/README.md")
+
+    assert response.status_code == 200
+    assert '<pre class="mermaid">graph TD\n  A --&gt; B\n</pre>' in response.text
+    assert 'data-language="mermaid"' not in response.text
 
 
 def test_front_matter_controls_title_navigation_and_hidden_pages(tmp_path: Path) -> None:

@@ -16,6 +16,10 @@ install-python: .uv ## Install development and lint dependencies
 .PHONY: install
 install: install-python ## Install local development dependencies
 
+.PHONY: install-assets
+install-assets: ## Install optional Node dependencies for refreshing vendored browser assets
+	npm ci
+
 .PHONY: install-all-python
 install-all-python: .uv ## Install and sync an environment for every supported Python version
 	UV_PROJECT_ENVIRONMENT=.venv311 uv sync --python 3.11 --frozen
@@ -29,6 +33,14 @@ setup: install ## Backward-compatible alias for install
 .PHONY: sync
 sync: .uv ## Update local packages and uv.lock
 	uv sync
+
+.PHONY: vendor-assets
+vendor-assets: ## Refresh vendored browser assets from installed Node packages
+	npm run vendor
+
+.PHONY: update-mermaid
+update-mermaid: ## Update Mermaid and refresh its vendored browser assets
+	npm run update:mermaid
 
 .PHONY: clean
 clean: ## Remove generated build and tool artifacts
