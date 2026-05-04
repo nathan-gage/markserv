@@ -111,8 +111,12 @@ def test_demo_uses_uvicorn_reload_when_env_var_set(monkeypatch: pytest.MonkeyPat
     def fail_create_app(_site: object) -> object:
         raise AssertionError("create_app should not be called when Python reload is enabled")
 
+    def fail_create_markserv_application(_site: object) -> object:
+        raise AssertionError("create_markserv_application should not be called when Python reload is enabled")
+
     monkeypatch.setenv(cli.PYTHON_RELOAD_ENV_VAR, "1")
     monkeypatch.setattr(demo, "create_app", fail_create_app)
+    monkeypatch.setattr(demo, "create_markserv_application", fail_create_markserv_application)
     monkeypatch.setattr(cli, "run_python_reloading_server", fake_run_python_reloading_server)
 
     demo.main(["--no-open", "--port", "9001"])

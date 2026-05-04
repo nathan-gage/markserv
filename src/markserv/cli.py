@@ -4,10 +4,11 @@ import contextlib
 import logging
 import os
 import select
+import socket
 import sys
 import threading
 import webbrowser
-from collections.abc import Iterator, Mapping
+from collections.abc import Awaitable, Callable, Iterator, Mapping
 from pathlib import Path
 from typing import Annotated, Protocol
 
@@ -20,8 +21,8 @@ from rich.console import Console
 from rich.logging import RichHandler
 from uvicorn import Config, Server
 
-from .app import create_app
-from .content import build_config, build_file_site
+from .app import MarkservApplication, create_app, create_markserv_application
+from .content import ServeConfig, SiteSource, build_config, build_file_site
 from .settings import PYTHON_RELOAD_ENV_VAR as _PYTHON_RELOAD_ENV_VAR
 from .settings import TARGET_ENV_VAR as _TARGET_ENV_VAR
 from .settings import python_reload_enabled, target_from_env
@@ -33,6 +34,8 @@ class StoppableServer(Protocol):
 
     def run(self) -> None: ...
 
+
+ShutdownHook = Callable[[], Awaitable[None]]
 
 console = Console(stderr=True)
 QUIT_KEYS = {"q", "Q", "\x1b"}
@@ -49,6 +52,21 @@ app = App(
     help_formatter=PlainFormatter(),
     result_action="return_value",
 )
+
+
+class MarkservServer(Server):
+    def __init__(
+        self,
+        config: Config,
+        *,
+        before_shutdown: ShutdownHook,
+    ) -> None:
+        super().__init__(config)
+        self._before_shutdown = before_shutdown
+
+    async def shutdown(self, sockets: list[socket.socket] | None = None) -> None:
+        await self._before_shutdown()
+        await super().shutdown(sockets)
 
 
 def _validate_target(_type_: object, tokens: tuple[Token, ...]) -> Path:
@@ -115,17 +133,24 @@ def print_startup_banner(*, source: str, root_dir: str, url: str, open_browser: 
     console.print(f"[dim]{quit_hint}[/]")
 
 
-def create_server(app: FastAPI, *, host: str, port: int) -> Server:
-    return Server(
+def create_server(
+    application: FastAPI,
+    *,
+    host: str,
+    port: int,
+    before_shutdown: ShutdownHook,
+) -> Server:
+    return MarkservServer(
         Config(
-            app,
+            application,
             host=host,
             port=port,
             log_level="warning",
             access_log=False,
             log_config=None,
             timeout_graceful_shutdown=SHUTDOWN_GRACE_SECONDS,
-        )
+        ),
+        before_shutdown=before_shutdown,
     )
 
 
@@ -153,7 +178,6 @@ def _request_server_shutdown(server: StoppableServer, stop_event: threading.Even
         return
     console.print("[dim]Stopping server...[/dim]")
     server.should_exit = True
-    server.force_exit = True
     stop_event.set()
 
 
@@ -209,6 +233,7 @@ def serve_application(
     open_browser: bool,
     app_factory_import: str | None = None,
     env_updates: Mapping[str, str] | None = None,
+    before_shutdown: ShutdownHook | None = None,
 ) -> None:
     configure_logging()
     url = browser_url(host, port)
@@ -233,9 +258,15 @@ def serve_application(
 
     if application is None:
         raise ValueError("application is required when Python reload is disabled")
+    if before_shutdown is None:
+        raise ValueError("before_shutdown is required when Python reload is disabled")
 
-    server = create_server(application, host=host, port=port)
+    server = create_server(application, host=host, port=port, before_shutdown=before_shutdown)
     run_server(server)
+
+
+def _application_for_serving(config_or_site: ServeConfig | SiteSource) -> MarkservApplication | None:
+    return None if python_reload_enabled() else create_markserv_application(config_or_site)
 
 
 @app.default
@@ -259,8 +290,9 @@ def serve(
     """Serve GitHub-flavored markdown from a file or directory."""
     config = build_config(path)
     site = build_file_site(config)
+    markserv_application = _application_for_serving(site)
     serve_application(
-        None if python_reload_enabled() else create_app(site),
+        None if markserv_application is None else markserv_application.app,
         source=str(config.source),
         root_dir=str(config.root_dir),
         host=host,
@@ -268,6 +300,7 @@ def serve(
         open_browser=open_browser,
         app_factory_import="markserv.cli:create_app_from_env",
         env_updates={TARGET_ENV_VAR: str(config.source)},
+        before_shutdown=None if markserv_application is None else markserv_application.runtime.shutdown,
     )
 
 

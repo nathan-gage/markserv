@@ -6,7 +6,7 @@ from cyclopts import App, Parameter
 from cyclopts.help import PlainFormatter
 from fastapi import FastAPI
 
-from .app import create_app
+from .app import create_app, create_markserv_application
 from .cli import DEFAULT_HOST, DEFAULT_PORT, serve_application
 from .content import SyntheticSite
 from .settings import python_reload_enabled
@@ -323,14 +323,16 @@ def create_demo_app() -> FastAPI:
 
 def serve_demo(*, host: str, port: int, open_browser: bool) -> None:
     site = build_demo_site()
+    markserv_application = None if python_reload_enabled() else create_markserv_application(site)
     serve_application(
-        None if python_reload_enabled() else create_app(site),
+        None if markserv_application is None else markserv_application.app,
         source="markserv demo",
         root_dir=site.root_label,
         host=host,
         port=port,
         open_browser=open_browser,
         app_factory_import="markserv.demo:create_demo_app",
+        before_shutdown=None if markserv_application is None else markserv_application.runtime.shutdown,
     )
 
 

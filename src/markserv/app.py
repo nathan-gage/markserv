@@ -1,4 +1,4 @@
 from .content import WatchPathFilter, build_config
-from .web import create_app
+from .web import MarkservApplication, create_app, create_markserv_application
 
-__all__ = ["WatchPathFilter", "build_config", "create_app"]
+__all__ = ["MarkservApplication", "WatchPathFilter", "build_config", "create_app", "create_markserv_application"]

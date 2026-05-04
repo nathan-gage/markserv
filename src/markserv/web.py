@@ -5,6 +5,7 @@ import contextlib
 import json
 import mimetypes
 from collections.abc import AsyncIterator, Awaitable, Callable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TypeVar
 
@@ -49,6 +50,12 @@ PACKAGE_DIR = Path(__file__).resolve().parent
 PUBLIC_DIR = PACKAGE_DIR / "public"
 DEV_RELOAD_ASSET_EXTENSIONS = {".css", ".js"}
 V = TypeVar("V", DocsPageView, EmptyPageView)
+
+
+@dataclass(frozen=True, slots=True)
+class MarkservApplication:
+    app: FastAPI
+    runtime: SiteRuntime
 
 
 def _response_headers_for_file(path: Path) -> dict[str, str]:
@@ -230,8 +237,10 @@ def event_stream_response(broker: ReloadBroker, *, retry_ms: int) -> StreamingRe
     async def event_stream() -> AsyncIterator[str]:
         version = broker.version
         yield f"retry: {retry_ms}\n\n"
-        while True:
+        while not broker.closed:
             version, changed = await broker.wait_for_update(version)
+            if broker.closed:
+                break
             if changed:
                 yield "event: reload\ndata: now\n\n"
             else:
@@ -252,7 +261,7 @@ def is_htmx_request(request: Request) -> bool:
     return request.headers.get("hx-request") == "true"
 
 
-def create_app(config_or_site: ServeConfig | SiteSource) -> FastAPI:
+def create_markserv_application(config_or_site: ServeConfig | SiteSource) -> MarkservApplication:
     site: SiteSource = build_file_site(config_or_site) if isinstance(config_or_site, ServeConfig) else config_or_site
     runtime = SiteRuntime(site=site, dev_reload=python_reload_enabled())
 
@@ -282,6 +291,7 @@ def create_app(config_or_site: ServeConfig | SiteSource) -> FastAPI:
         try:
             yield
         finally:
+            await runtime.shutdown()
             for task in tasks:
                 task.cancel()
             for task in tasks:
@@ -395,4 +405,8 @@ def create_app(config_or_site: ServeConfig | SiteSource) -> FastAPI:
             fragment_renderer=render_docs_fragment,
         )
 
-    return app
+    return MarkservApplication(app=app, runtime=runtime)
+
+
+def create_app(config_or_site: ServeConfig | SiteSource) -> FastAPI:
+    return create_markserv_application(config_or_site).app

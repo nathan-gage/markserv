@@ -19,6 +19,17 @@ class FakeServer:
         self.run_called = True
 
 
+class FakeRuntime:
+    async def shutdown(self) -> None:
+        return None
+
+
+class FakeMarkservApplication:
+    def __init__(self, app: object) -> None:
+        self.app = app
+        self.runtime = FakeRuntime()
+
+
 def test_help_uses_plain_formatter(capsys: pytest.CaptureFixture[str]) -> None:
     cli.main(["--help"])
     captured = capsys.readouterr()
@@ -50,14 +61,21 @@ def test_cli_parses_options_and_invokes_server(monkeypatch: pytest.MonkeyPatch, 
         observed["opened_url"] = url
         return True
 
-    def fake_create_app(config: object) -> object:
+    def fake_create_markserv_application(config: object) -> FakeMarkservApplication:
         observed["config"] = config
-        return {"config": config}
+        return FakeMarkservApplication({"config": config})
 
-    def fake_create_server(app: object, *, host: str, port: int) -> FakeServer:
+    def fake_create_server(
+        app: object,
+        *,
+        host: str,
+        port: int,
+        before_shutdown: object | None = None,
+    ) -> FakeServer:
         observed["app"] = app
         observed["host"] = host
         observed["port"] = port
+        observed["before_shutdown"] = before_shutdown
         return fake_server
 
     def fake_run_server(server: object) -> None:
@@ -65,7 +83,7 @@ def test_cli_parses_options_and_invokes_server(monkeypatch: pytest.MonkeyPatch, 
 
     monkeypatch.setattr("markserv.cli.threading.Timer", ImmediateTimer)
     monkeypatch.setattr("markserv.cli.webbrowser.open", fake_open)
-    monkeypatch.setattr(cli, "create_app", fake_create_app)
+    monkeypatch.setattr(cli, "create_markserv_application", fake_create_markserv_application)
     monkeypatch.setattr(cli, "create_server", fake_create_server)
     monkeypatch.setattr(cli, "run_server", fake_run_server)
 
@@ -74,6 +92,7 @@ def test_cli_parses_options_and_invokes_server(monkeypatch: pytest.MonkeyPatch, 
     assert observed["host"] == "0.0.0.0"
     assert observed["port"] == 9000
     assert observed["server"] is fake_server
+    assert callable(observed["before_shutdown"])
     assert observed["opened_url"] == "http://localhost:9000"
     assert observed["timer_interval"] == 0.8
 
@@ -88,21 +107,28 @@ def test_cli_allows_disabling_browser_open(monkeypatch: pytest.MonkeyPatch, tmp_
     def fail_timer(_interval: float, _function: object) -> object:
         raise AssertionError("Timer should not be created when --no-open is passed")
 
-    def fake_create_app(config: object) -> object:
+    def fake_create_markserv_application(config: object) -> FakeMarkservApplication:
         observed["config"] = config
-        return {"config": config}
+        return FakeMarkservApplication({"config": config})
 
-    def fake_create_server(app: object, *, host: str, port: int) -> FakeServer:
+    def fake_create_server(
+        app: object,
+        *,
+        host: str,
+        port: int,
+        before_shutdown: object | None = None,
+    ) -> FakeServer:
         observed["app"] = app
         observed["host"] = host
         observed["port"] = port
+        observed["before_shutdown"] = before_shutdown
         return fake_server
 
     def fake_run_server(server: object) -> None:
         observed["server"] = server
 
     monkeypatch.setattr("markserv.cli.threading.Timer", fail_timer)
-    monkeypatch.setattr(cli, "create_app", fake_create_app)
+    monkeypatch.setattr(cli, "create_markserv_application", fake_create_markserv_application)
     monkeypatch.setattr(cli, "create_server", fake_create_server)
     monkeypatch.setattr(cli, "run_server", fake_run_server)
 
@@ -111,6 +137,7 @@ def test_cli_allows_disabling_browser_open(monkeypatch: pytest.MonkeyPatch, tmp_
     assert observed["server"] is fake_server
     assert observed["host"] == cli.DEFAULT_HOST
     assert observed["port"] == cli.DEFAULT_PORT
+    assert callable(observed["before_shutdown"])
 
 
 def test_cli_uses_uvicorn_reload_when_env_var_set(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -151,10 +178,14 @@ def test_cli_uses_uvicorn_reload_when_env_var_set(monkeypatch: pytest.MonkeyPatc
     def fail_create_app(_site: object) -> object:
         raise AssertionError("create_app should not be called when Python reload is enabled")
 
+    def fail_create_markserv_application(_site: object) -> object:
+        raise AssertionError("create_markserv_application should not be called when Python reload is enabled")
+
     monkeypatch.setenv(cli.PYTHON_RELOAD_ENV_VAR, "1")
     monkeypatch.setattr("markserv.cli.threading.Timer", ImmediateTimer)
     monkeypatch.setattr("markserv.cli.webbrowser.open", fake_open)
     monkeypatch.setattr(cli, "create_app", fail_create_app)
+    monkeypatch.setattr(cli, "create_markserv_application", fail_create_markserv_application)
     monkeypatch.setattr(cli, "run_python_reloading_server", fake_run_python_reloading_server)
 
     cli.main([str(markdown_file), "--host", "0.0.0.0", "--port", "9000"])
@@ -184,5 +215,5 @@ def test_request_server_shutdown_marks_server_and_event() -> None:
     cli._request_server_shutdown(server, stop_event)
 
     assert server.should_exit is True
-    assert server.force_exit is True
+    assert server.force_exit is False
     assert stop_event.is_set()
