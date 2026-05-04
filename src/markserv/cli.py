@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import logging
 import os
@@ -51,6 +52,22 @@ app = App(
 )
 
 
+class UvicornShutdownNoiseFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        message = record.getMessage()
+        if "timeout graceful shutdown exceeded" in message:
+            return False
+
+        exc_info = record.exc_info
+        if exc_info is None:
+            return True
+
+        exc_type, exc, _traceback = exc_info
+        if isinstance(exc, asyncio.CancelledError) or exc_type is asyncio.CancelledError:
+            return False
+        return True
+
+
 def _validate_target(_type_: object, tokens: tuple[Token, ...]) -> Path:
     raw_path = Path(tokens[0].value)
     build_config(raw_path)
@@ -73,6 +90,7 @@ def configure_logging() -> None:
         ],
         force=True,
     )
+    logging.getLogger("uvicorn.error").addFilter(UvicornShutdownNoiseFilter())
 
 
 def browser_url(host: str, port: int) -> str:
@@ -153,7 +171,6 @@ def _request_server_shutdown(server: StoppableServer, stop_event: threading.Even
         return
     console.print("[dim]Stopping server...[/dim]")
     server.should_exit = True
-    server.force_exit = True
     stop_event.set()
 
 
