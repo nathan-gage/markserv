@@ -25,27 +25,39 @@ def _docs_view_cache_key(view: DocsPageView) -> tuple[str, tuple[str, ...], bool
 class ReloadBroker:
     def __init__(self) -> None:
         self._version = 0
+        self._closed = False
         self._condition = asyncio.Condition()
 
     @property
     def version(self) -> int:
         return self._version
 
+    @property
+    def closed(self) -> bool:
+        return self._closed
+
     async def publish(self) -> None:
         async with self._condition:
+            if self._closed:
+                return
             self._version += 1
+            self._condition.notify_all()
+
+    async def close(self) -> None:
+        async with self._condition:
+            self._closed = True
             self._condition.notify_all()
 
     async def wait_for_update(self, version: int, timeout: float = 15.0) -> tuple[int, bool]:
         async with self._condition:
             try:
                 await asyncio.wait_for(
-                    self._condition.wait_for(lambda: self._version > version),
+                    self._condition.wait_for(lambda: self._closed or self._version > version),
                     timeout=timeout,
                 )
             except TimeoutError:
                 return version, False
-            return self._version, True
+            return self._version, self._version > version
 
 
 @dataclass(slots=True)
@@ -104,6 +116,10 @@ class SiteRuntime:
         self._icon_cache.clear()
         self._docs_view_cache.clear()
         self._sidebar_fragment_cache.clear()
+
+    async def shutdown(self) -> None:
+        await self.broker.close()
+        await self.dev_reload_broker.close()
 
     def cached_docs_view(self, rel_path: str, navigation: NavigationState) -> DocsPageView | None:
         cache_key = (rel_path, navigation.open_paths, navigation.explicit)

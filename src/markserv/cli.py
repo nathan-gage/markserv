@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-import asyncio
 import contextlib
 import logging
 import os
 import select
+import socket
 import sys
 import threading
 import webbrowser
-from collections.abc import Iterator, Mapping
+from collections.abc import Awaitable, Callable, Iterator, Mapping
 from pathlib import Path
 from typing import Annotated, Protocol
 
@@ -52,20 +52,20 @@ app = App(
 )
 
 
-class UvicornShutdownNoiseFilter(logging.Filter):
-    def filter(self, record: logging.LogRecord) -> bool:
-        message = record.getMessage()
-        if "timeout graceful shutdown exceeded" in message:
-            return False
+class MarkservServer(Server):
+    def __init__(
+        self,
+        config: Config,
+        *,
+        before_shutdown: Callable[[], Awaitable[None]] | None = None,
+    ) -> None:
+        super().__init__(config)
+        self._before_shutdown = before_shutdown
 
-        exc_info = record.exc_info
-        if exc_info is None:
-            return True
-
-        exc_type, exc, _traceback = exc_info
-        if isinstance(exc, asyncio.CancelledError) or exc_type is asyncio.CancelledError:
-            return False
-        return True
+    async def shutdown(self, sockets: list[socket.socket] | None = None) -> None:
+        if self._before_shutdown is not None:
+            await self._before_shutdown()
+        await super().shutdown(sockets)
 
 
 def _validate_target(_type_: object, tokens: tuple[Token, ...]) -> Path:
@@ -90,7 +90,6 @@ def configure_logging() -> None:
         ],
         force=True,
     )
-    logging.getLogger("uvicorn.error").addFilter(UvicornShutdownNoiseFilter())
 
 
 def browser_url(host: str, port: int) -> str:
@@ -134,7 +133,9 @@ def print_startup_banner(*, source: str, root_dir: str, url: str, open_browser: 
 
 
 def create_server(app: FastAPI, *, host: str, port: int) -> Server:
-    return Server(
+    runtime = getattr(app.state, "markserv_runtime", None)
+    before_shutdown = None if runtime is None else runtime.shutdown
+    return MarkservServer(
         Config(
             app,
             host=host,
@@ -143,7 +144,8 @@ def create_server(app: FastAPI, *, host: str, port: int) -> Server:
             access_log=False,
             log_config=None,
             timeout_graceful_shutdown=SHUTDOWN_GRACE_SECONDS,
-        )
+        ),
+        before_shutdown=before_shutdown,
     )
 
 

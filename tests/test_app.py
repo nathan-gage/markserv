@@ -1,14 +1,18 @@
 from __future__ import annotations
 
+import asyncio
 import json
+from collections.abc import AsyncIterator
 from pathlib import Path
+from typing import cast
 
 import pytest
 from fastapi.testclient import TestClient
 
 from markserv.app import WatchPathFilter, build_config, create_app
+from markserv.runtime import ReloadBroker
 from markserv.site import MarkdownPage, PageIndex
-from markserv.web import is_dev_reload_asset
+from markserv.web import event_stream_response, is_dev_reload_asset
 
 
 def write_text(path: Path, content: str) -> None:
@@ -43,6 +47,28 @@ def test_dev_reload_asset_filter_matches_css_and_js_only() -> None:
     assert is_dev_reload_asset("src/markserv/public/js/theme.js") is True
     assert is_dev_reload_asset("src/markserv/public/licenses/htmx.LICENSE") is False
     assert is_dev_reload_asset("src/markserv/rendering.py") is False
+
+
+def test_event_stream_stops_when_broker_closes() -> None:
+    async def run() -> None:
+        broker = ReloadBroker()
+        response = event_stream_response(broker, retry_ms=1000)
+        stream = cast(AsyncIterator[str], response.body_iterator.__aiter__())
+
+        assert await anext(stream) == "retry: 1000\n\n"
+
+        async def read_next_event() -> str:
+            return await anext(stream)
+
+        next_event = asyncio.create_task(read_next_event())
+
+        await asyncio.sleep(0)
+        await broker.close()
+
+        with pytest.raises(StopAsyncIteration):
+            await asyncio.wait_for(next_event, timeout=1)
+
+    asyncio.run(run())
 
 
 def test_python_reload_mode_includes_dev_reload_client(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

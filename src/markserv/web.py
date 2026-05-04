@@ -230,8 +230,10 @@ def event_stream_response(broker: ReloadBroker, *, retry_ms: int) -> StreamingRe
     async def event_stream() -> AsyncIterator[str]:
         version = broker.version
         yield f"retry: {retry_ms}\n\n"
-        while True:
+        while not broker.closed:
             version, changed = await broker.wait_for_update(version)
+            if broker.closed:
+                break
             if changed:
                 yield "event: reload\ndata: now\n\n"
             else:
@@ -282,6 +284,7 @@ def create_app(config_or_site: ServeConfig | SiteSource) -> FastAPI:
         try:
             yield
         finally:
+            await runtime.shutdown()
             for task in tasks:
                 task.cancel()
             for task in tasks:
@@ -289,6 +292,7 @@ def create_app(config_or_site: ServeConfig | SiteSource) -> FastAPI:
                     await task
 
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
+    app.state.markserv_runtime = runtime
 
     @app.get("/public/{asset_path:path}")
     async def public_asset(asset_path: str) -> Response:

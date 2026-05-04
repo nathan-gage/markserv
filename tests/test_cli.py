@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import asyncio
-import logging
 import os
 import threading
 from pathlib import Path
@@ -188,38 +186,3 @@ def test_request_server_shutdown_marks_server_and_event() -> None:
     assert server.should_exit is True
     assert server.force_exit is False
     assert stop_event.is_set()
-
-
-def test_uvicorn_shutdown_noise_filter_suppresses_expected_cancellation() -> None:
-    noise_filter = cli.UvicornShutdownNoiseFilter()
-    timeout_record = logging.LogRecord(
-        "uvicorn.error",
-        logging.WARNING,
-        __file__,
-        1,
-        "Cancel 1 running task(s), timeout graceful shutdown exceeded",
-        (),
-        None,
-    )
-    cancel_record = logging.LogRecord(
-        "uvicorn.error",
-        logging.ERROR,
-        __file__,
-        1,
-        "Exception in ASGI application",
-        (),
-        (asyncio.CancelledError, asyncio.CancelledError(), None),
-    )
-    real_error_record = logging.LogRecord(
-        "uvicorn.error",
-        logging.ERROR,
-        __file__,
-        1,
-        "Exception in ASGI application",
-        (),
-        (RuntimeError, RuntimeError("boom"), None),
-    )
-
-    assert noise_filter.filter(timeout_record) is False
-    assert noise_filter.filter(cancel_record) is False
-    assert noise_filter.filter(real_error_record) is True
