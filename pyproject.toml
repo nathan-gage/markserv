@@ -38,7 +38,7 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["httpx>=0.28.1", "pytest>=8.4.0", "yamlfix>=1.19.1"]
+dev = ["httpx2>=2.4.0", "pytest>=8.4.0", "yamlfix>=1.19.1"]
 lint = [
   "mypy>=1.15.0",
   "pyright>=1.1.408",
