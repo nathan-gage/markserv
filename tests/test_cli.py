@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import socket
 import threading
 from pathlib import Path
 
@@ -97,6 +98,19 @@ def test_cli_parses_options_and_invokes_server(monkeypatch: pytest.MonkeyPatch, 
     assert observed["timer_interval"] == 0.8
 
 
+def test_find_available_port_skips_busy_port() -> None:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as busy_socket:
+        busy_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        busy_socket.bind((cli.DEFAULT_HOST, 0))
+        busy_socket.listen(1)
+        busy_port = int(busy_socket.getsockname()[1])
+
+        selected_port = cli.find_available_port(cli.DEFAULT_HOST, busy_port)
+
+    assert selected_port != busy_port
+    assert selected_port > busy_port
+
+
 def test_cli_allows_disabling_browser_open(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     markdown_file = tmp_path / "README.md"
     markdown_file.write_text("# Home\n", encoding="utf-8")
@@ -128,6 +142,7 @@ def test_cli_allows_disabling_browser_open(monkeypatch: pytest.MonkeyPatch, tmp_
         observed["server"] = server
 
     monkeypatch.setattr("markserv.cli.threading.Timer", fail_timer)
+    monkeypatch.setattr(cli, "find_available_port", lambda _host, _preferred_port: cli.DEFAULT_PORT)
     monkeypatch.setattr(cli, "create_markserv_application", fake_create_markserv_application)
     monkeypatch.setattr(cli, "create_server", fake_create_server)
     monkeypatch.setattr(cli, "run_server", fake_run_server)
@@ -137,6 +152,57 @@ def test_cli_allows_disabling_browser_open(monkeypatch: pytest.MonkeyPatch, tmp_
     assert observed["server"] is fake_server
     assert observed["host"] == cli.DEFAULT_HOST
     assert observed["port"] == cli.DEFAULT_PORT
+    assert callable(observed["before_shutdown"])
+
+
+def test_cli_auto_selects_default_port(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    markdown_file = tmp_path / "README.md"
+    markdown_file.write_text("# Home\n", encoding="utf-8")
+
+    observed: dict[str, object] = {}
+    fake_server = FakeServer()
+
+    def fake_find_available_port(
+        host: str, preferred_port: int, *, max_attempts: int = cli.MAX_AUTO_PORT_ATTEMPTS
+    ) -> int:
+        observed["preferred_host"] = host
+        observed["preferred_port"] = preferred_port
+        observed["max_attempts"] = max_attempts
+        return 4555
+
+    def fake_create_markserv_application(config: object) -> FakeMarkservApplication:
+        observed["config"] = config
+        return FakeMarkservApplication({"config": config})
+
+    def fake_create_server(
+        app: object,
+        *,
+        host: str,
+        port: int,
+        before_shutdown: object | None = None,
+    ) -> FakeServer:
+        observed["app"] = app
+        observed["host"] = host
+        observed["port"] = port
+        observed["before_shutdown"] = before_shutdown
+        return fake_server
+
+    def fake_run_server(server: object) -> None:
+        observed["server"] = server
+
+    monkeypatch.setattr("markserv.cli.threading.Timer", lambda _interval, _function: None)
+    monkeypatch.setattr(cli, "find_available_port", fake_find_available_port)
+    monkeypatch.setattr(cli, "create_markserv_application", fake_create_markserv_application)
+    monkeypatch.setattr(cli, "create_server", fake_create_server)
+    monkeypatch.setattr(cli, "run_server", fake_run_server)
+
+    cli.main([str(markdown_file), "--no-open"])
+
+    assert observed["preferred_host"] == cli.DEFAULT_HOST
+    assert observed["preferred_port"] == cli.DEFAULT_PORT
+    assert observed["max_attempts"] == cli.MAX_AUTO_PORT_ATTEMPTS
+    assert observed["port"] == 4555
+    assert observed["server"] is fake_server
     assert callable(observed["before_shutdown"])
 
 
