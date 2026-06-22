@@ -340,7 +340,12 @@ def serve_demo(*, host: str, port: int, open_browser: bool) -> None:
 def serve(
     *,
     host: Annotated[str, Parameter(help="Host interface to bind.")] = DEFAULT_HOST,
-    port: Annotated[int, Parameter(help="Port to listen on.")] = DEFAULT_PORT,
+    port: Annotated[
+        int,
+        Parameter(
+            help=f"Port to listen on. Default {DEFAULT_PORT} falls forward to the next free port; use 0 for any free port.",
+        ),
+    ] = DEFAULT_PORT,
     open_browser: Annotated[
         bool,
         Parameter(name="--open", help="Open the app in your default browser after the server starts."),

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import errno
 import logging
 import os
 import select
@@ -41,6 +42,7 @@ console = Console(stderr=True)
 QUIT_KEYS = {"q", "Q", "\x1b"}
 DEFAULT_HOST = "localhost"
 DEFAULT_PORT = 4422
+MAX_AUTO_PORT_ATTEMPTS = 100
 PYTHON_RELOAD_ENV_VAR = _PYTHON_RELOAD_ENV_VAR
 TARGET_ENV_VAR = _TARGET_ENV_VAR
 PYTHON_RELOAD_DIR = Path(__file__).resolve().parent
@@ -96,6 +98,50 @@ def configure_logging() -> None:
 def browser_url(host: str, port: int) -> str:
     public_host = "localhost" if host in {"127.0.0.1", "0.0.0.0", "localhost"} else host
     return f"http://{public_host}:{port}"
+
+
+def _socket_family_for_host(host: str) -> socket.AddressFamily:
+    return socket.AF_INET6 if ":" in host else socket.AF_INET
+
+
+@contextlib.contextmanager
+def _listening_probe_socket(host: str, port: int) -> Iterator[socket.socket]:
+    with socket.socket(_socket_family_for_host(host), socket.SOCK_STREAM) as probe:
+        probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        probe.bind((host, port))
+        probe.listen(1)
+        yield probe
+
+
+def _port_is_available(host: str, port: int) -> bool:
+    try:
+        with _listening_probe_socket(host, port):
+            return True
+    except OSError as exc:
+        if exc.errno in {errno.EACCES, errno.EADDRINUSE}:
+            return False
+        raise
+
+
+def find_available_port(host: str, preferred_port: int, *, max_attempts: int = MAX_AUTO_PORT_ATTEMPTS) -> int:
+    if preferred_port == 0:
+        with _listening_probe_socket(host, 0) as probe:
+            return int(probe.getsockname()[1])
+
+    stop_port = min(65535, preferred_port + max_attempts - 1)
+    for candidate in range(preferred_port, stop_port + 1):
+        if _port_is_available(host, candidate):
+            return candidate
+
+    raise RuntimeError(f"No available port found from {preferred_port} through {stop_port}")
+
+
+def resolve_port(host: str, port: int) -> int:
+    if port == DEFAULT_PORT:
+        return find_available_port(host, DEFAULT_PORT)
+    if port == 0:
+        return find_available_port(host, 0)
+    return port
 
 
 @contextlib.contextmanager
@@ -236,6 +282,7 @@ def serve_application(
     before_shutdown: ShutdownHook | None = None,
 ) -> None:
     configure_logging()
+    port = resolve_port(host, port)
     url = browser_url(host, port)
     python_reload = python_reload_enabled()
     print_startup_banner(
@@ -281,7 +328,12 @@ def serve(
     /,
     *,
     host: Annotated[str, Parameter(help="Host interface to bind.")] = DEFAULT_HOST,
-    port: Annotated[int, Parameter(help="Port to listen on.")] = DEFAULT_PORT,
+    port: Annotated[
+        int,
+        Parameter(
+            help=f"Port to listen on. Default {DEFAULT_PORT} falls forward to the next free port; use 0 for any free port.",
+        ),
+    ] = DEFAULT_PORT,
     open_browser: Annotated[
         bool,
         Parameter(name="--open", help="Open the app in your default browser after the server starts."),

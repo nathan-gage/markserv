@@ -59,6 +59,7 @@ markserv.demo
 | --- | --- |
 | `markserv .` | Serve the current directory |
 | `markserv --host localhost --port 4422 .` | Bind to a custom host/port |
+| `markserv --port 0 README.md` | Bind to any free port |
 | `markserv --no-open README.md` | Start without opening a browser |
 | `markserv.demo --no-open --port 9001` | Run the demo on a custom port |
 
@@ -66,6 +67,7 @@ markserv.demo
 
 - Renders common Markdown extensions like `.md` and `.markdown`
 - Watches Markdown files and reloads the browser when content changes
+- Supports multiple concurrent instances by choosing the next free default port when needed
 - Supports Cmd/Ctrl+K quick search across page titles, headings, paths, and body text
 - Respects `.gitignore` while scanning, so ignored trees like `.venv/` are skipped
 - Serves linked local assets from the same file tree with safer defaults for hidden, executable, and sensitive files
