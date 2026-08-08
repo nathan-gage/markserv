@@ -8,6 +8,6 @@
     "vendor:mermaid": "node scripts/vendor-mermaid.mjs"
   },
   "dependencies": {
-    "mermaid": "11.15.0"
+    "mermaid": "11.16.1"
   }
 }
