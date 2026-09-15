@@ -170,7 +170,7 @@ def _default_doc_from_candidate_pages(normalized_prefix: str, candidate_pages: t
             if candidate in preferred_set:
                 return candidate
 
-    return sorted(preferred_pages, key=lambda page: (page.rel_path.count("/"), *sort_markdown_page(page)))[0].rel_path
+    return min(preferred_pages, key=lambda page: (page.rel_path.count("/"), *sort_markdown_page(page))).rel_path
 
 
 def sort_markdown_page(page: MarkdownPage) -> tuple[bool, float, str, str]:

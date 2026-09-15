@@ -44,12 +44,12 @@ update-mermaid: ## Update Mermaid and refresh its vendored browser assets
 
 .PHONY: clean
 clean: ## Remove generated build and tool artifacts
-	rm -rf .coverage .mypy_cache .pytest_cache .ruff_cache .pyright dist build htmlcov .venv311 .venv312 .venv313 .venv314
+	rm -rf .coverage .pytest_cache .ruff_cache .pyright dist build htmlcov .venv311 .venv312 .venv313 .venv314
 
 .PHONY: format-python
 format-python: ## Format Python code
-	uv run ruff format src tests
-	uv run ruff check --fix --fix-only src tests
+	uv run ruff format src tests typings
+	uv run ruff check --fix --fix-only src tests typings
 
 .PHONY: format-toml
 format-toml: ## Format TOML files
@@ -64,7 +64,7 @@ format: format-python format-toml format-yaml ## Format the codebase
 
 .PHONY: format-check-python
 format-check-python: ## Check Python formatting without modifying files
-	uv run ruff format --check src tests
+	uv run ruff format --check src tests typings
 
 .PHONY: format-check-toml
 format-check-toml: ## Check TOML formatting without modifying files
@@ -79,18 +79,18 @@ format-check: format-check-python format-check-toml format-check-yaml ## Check f
 
 .PHONY: lint
 lint: ## Lint the code
-	uv run ruff check src tests
+	uv run ruff check src tests typings
 
 .PHONY: typecheck-pyright
 typecheck-pyright: ## Run static type checking with Pyright
 	PYRIGHT_PYTHON_IGNORE_WARNINGS=1 uv run pyright
 
-.PHONY: typecheck-mypy
-typecheck-mypy: ## Run static type checking with Mypy
-	uv run mypy
+.PHONY: typecheck-ty
+typecheck-ty: ## Run static type checking with ty
+	uv run ty check
 
 .PHONY: typecheck
-typecheck: typecheck-pyright typecheck-mypy ## Run static type checking
+typecheck: typecheck-pyright typecheck-ty ## Run static type checking
 
 .PHONY: test
 test: ## Run tests (set PYTEST_PYTHON=3.14 to choose an interpreter)

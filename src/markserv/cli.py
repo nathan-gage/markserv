@@ -216,7 +216,7 @@ def run_python_reloading_server(app_factory_import: str, *, host: str, port: int
 
 
 def _supports_quit_prompt() -> bool:
-    return sys.stdin.isatty() and os.name != "nt"
+    return bool(sys.stdin.isatty()) and os.name != "nt"
 
 
 def _request_server_shutdown(server: StoppableServer, stop_event: threading.Event) -> None:

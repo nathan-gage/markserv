@@ -49,7 +49,12 @@ _COLOR_STOPS_C = (
 def _params_from_hash(digest: bytes, attempt: int = 0) -> tuple[float, float, float, float]:
     idx = (digest[0] + attempt) % len(_GOOD_PARAMS)
     base = _GOOD_PARAMS[idx]
-    return tuple(base[i] + (digest[i + 1] / 255.0 - 0.5) * 0.16 for i in range(4))  # type: ignore[return-value]
+    return (
+        base[0] + (digest[1] / 255.0 - 0.5) * 0.16,
+        base[1] + (digest[2] / 255.0 - 0.5) * 0.16,
+        base[2] + (digest[3] / 255.0 - 0.5) * 0.16,
+        base[3] + (digest[4] / 255.0 - 0.5) * 0.16,
+    )
 
 
 def _hue_shift_from_hash(digest: bytes) -> float:

@@ -3,8 +3,7 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-import markserv.cli as cli
-import markserv.demo as demo
+from markserv import cli, demo
 from markserv.app import create_app
 
 

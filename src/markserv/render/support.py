@@ -23,7 +23,7 @@ def extract_title(markdown_text: str, fallback: str) -> str:
     match = TITLE_RE.search(markdown_text)
     if not match:
         return fallback
-    title = match.group(1).strip().strip("#").strip()
+    title: str = match.group(1).strip().strip("#").strip()
     return title or fallback
 
 

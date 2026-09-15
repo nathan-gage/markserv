@@ -195,7 +195,7 @@ def _extract_language(attrs: str) -> str | None:
     if match is None:
         return None
 
-    language = match.group(1).strip().split(maxsplit=1)[0]
+    language: str = match.group(1).strip().split(maxsplit=1)[0]
     return language or None
 
 
@@ -272,7 +272,7 @@ def _attr_value(attrs: str, pattern: re.Pattern[str]) -> str | None:
     match = pattern.search(attrs)
     if match is None:
         return None
-    value = match.group(1).strip()
+    value: str = match.group(1).strip()
     return value or None
 
 
