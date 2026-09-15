@@ -29,6 +29,8 @@ dependencies = [
   "fasthx[htmy]>=3.1.0",
   "fastapi>=0.115.12",
   "ignoretree>=0.2.0",
+  # Required by fasthx.htmy's import of htmy.jinja.
+  "markupsafe>=3.0.3",
   "pygments>=2.19.2",
   "rich>=14.0.0",
   "uvicorn>=0.34.0",
