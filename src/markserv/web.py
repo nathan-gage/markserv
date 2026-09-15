@@ -206,6 +206,7 @@ async def watch_for_changes(
     path_filter: WatchPathFilter,
     broker: ReloadBroker,
     *,
+    stop_event: asyncio.Event,
     on_change: Callable[[], Awaitable[None]] | None = None,
 ) -> None:
     async for changes in awatch(
@@ -213,6 +214,7 @@ async def watch_for_changes(
         watch_filter=path_filter,
         debounce=250,
         step=50,
+        stop_event=stop_event,
         ignore_permission_denied=True,
     ):
         if any(Path(path).name == ".gitignore" for _change, path in changes):
@@ -222,12 +224,13 @@ async def watch_for_changes(
         await broker.publish()
 
 
-async def watch_for_dev_reload_assets(public_dir: Path, broker: ReloadBroker) -> None:
+async def watch_for_dev_reload_assets(public_dir: Path, broker: ReloadBroker, *, stop_event: asyncio.Event) -> None:
     async for _changes in awatch(
         public_dir,
         watch_filter=lambda _change, path: is_dev_reload_asset(path),
         debounce=150,
         step=50,
+        stop_event=stop_event,
         ignore_permission_denied=True,
     ):
         await broker.publish()
@@ -267,6 +270,7 @@ def create_markserv_application(config_or_site: ServeConfig | SiteSource) -> Mar
 
     @contextlib.asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        stop_event = asyncio.Event()
         tasks: list[asyncio.Task[None]] = []
 
         if site.watch_root is not None and site.watch_filter is not None:
@@ -276,13 +280,18 @@ def create_markserv_application(config_or_site: ServeConfig | SiteSource) -> Mar
                         site.watch_root,
                         site.watch_filter,
                         runtime.broker,
+                        stop_event=stop_event,
                         on_change=runtime.invalidate,
                     )
                 )
             )
 
         if runtime.dev_reload:
-            tasks.append(asyncio.create_task(watch_for_dev_reload_assets(PUBLIC_DIR, runtime.dev_reload_broker)))
+            tasks.append(
+                asyncio.create_task(
+                    watch_for_dev_reload_assets(PUBLIC_DIR, runtime.dev_reload_broker, stop_event=stop_event)
+                )
+            )
 
         if not tasks:
             yield
@@ -291,12 +300,11 @@ def create_markserv_application(config_or_site: ServeConfig | SiteSource) -> Mar
         try:
             yield
         finally:
+            # Cancelling awatch tasks can abandon native workers; let them finish before shutdown returns.
+            stop_event.set()
             await runtime.shutdown()
             for task in tasks:
-                task.cancel()
-            for task in tasks:
-                with contextlib.suppress(asyncio.CancelledError):
-                    await task
+                await task
 
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
 

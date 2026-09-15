@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import asyncio
 import json
+import threading
 from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import cast
 
 import pytest
+from anyio.to_thread import run_sync
 from fastapi.testclient import TestClient
 
 from markserv.app import WatchPathFilter, build_config, create_app
@@ -67,6 +69,51 @@ def test_event_stream_stops_when_broker_closes() -> None:
 
         with pytest.raises(StopAsyncIteration):
             await asyncio.wait_for(next_event, timeout=1)
+
+    asyncio.run(run())
+
+
+def test_lifespan_waits_for_watcher_worker_to_finish(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    write_text(tmp_path / "README.md", "# Home\n")
+    monkeypatch.setenv("MARKSERV_PYTHON_RELOAD", "0")
+    app = create_app(build_config(tmp_path))
+
+    async def run() -> None:
+        loop = asyncio.get_running_loop()
+        entered = asyncio.Event()
+        release = threading.Event()
+        finished = threading.Event()
+
+        def worker() -> None:
+            loop.call_soon_threadsafe(entered.set)
+            release.wait()
+            finished.set()
+
+        async def controlled_awatch(
+            *_paths: Path, stop_event: asyncio.Event | None = None, **_kwargs: object
+        ) -> AsyncIterator[set[tuple[int, str]]]:
+            async def release_on_stop() -> None:
+                if stop_event is not None:
+                    await stop_event.wait()
+                    release.set()
+
+            stop_task = asyncio.create_task(release_on_stop())
+            try:
+                await run_sync(worker)
+                yield set()
+            finally:
+                stop_task.cancel()
+                await asyncio.gather(stop_task, return_exceptions=True)
+
+        monkeypatch.setattr("markserv.web.awatch", controlled_awatch)
+        try:
+            async with asyncio.timeout(5):
+                async with app.router.lifespan_context(app):
+                    await entered.wait()
+                assert finished.is_set(), "App lifespan exited while its watcher worker was still running"
+        finally:
+            release.set()
+            assert await run_sync(finished.wait, 5), "Watcher worker did not finish during cleanup"
 
     asyncio.run(run())
 
