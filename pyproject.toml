@@ -42,10 +42,10 @@ dependencies = [
 [dependency-groups]
 dev = ["httpx2>=2.4.0", "pytest>=8.4.0", "yamlfix>=1.19.1"]
 lint = [
-  "mypy>=1.15.0",
   "pyright>=1.1.408",
-  "ruff>=0.14.0",
+  "ruff>=0.16.7,<0.17",
   "taplo>=0.9.3",
+  "ty>=0.0.81",
   "types-pygments>=2.20.0.20260408",
   "types-pyyaml>=6.0.12.20260408",
 ]
@@ -88,10 +88,11 @@ include = [
 [tool.ruff]
 line-length = 120
 target-version = "py311"
-include = ["src/**/*.py", "tests/**/*.py"]
+include = ["src/**/*.py", "tests/**/*.py", "typings/**/*.pyi"]
 
 [tool.ruff.lint]
-extend-select = ["B", "FAST", "I", "Q", "RUF100", "UP"]
+extend-select = ["ANN", "B", "FAST", "I", "PYI", "Q", "RUF100", "UP"]
+preview = true
 
 [tool.ruff.lint.flake8-quotes]
 inline-quotes = "double"
@@ -119,11 +120,17 @@ executionEnvironments = [
   ] },
 ]
 
-[tool.mypy]
-python_version = "3.11"
-files = ["src", "tests"]
-mypy_path = "$MYPY_CONFIG_FILE_DIR/src:$MYPY_CONFIG_FILE_DIR/typings"
-strict = true
+[tool.ty.environment]
+extra-paths = ["typings"]
+
+[tool.ty.src]
+include = ["src", "tests", "typings"]
+
+[tool.ty.rules]
+dynamic-function-decorator-return = "error"
+missing-type-argument = "error"
+possibly-unresolved-reference = "warn"
+unsound-return-statement = "error"
 
 [tool.pytest.ini_options]
 addopts = "-ra"

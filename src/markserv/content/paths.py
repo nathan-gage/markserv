@@ -91,7 +91,7 @@ class SitePathError(LookupError):
 
 def humanize_name(stem: str) -> str:
     value = stem.replace("_", " ").replace("-", " ").strip()
-    return value if value else stem
+    return value or stem
 
 
 def is_markdown_path(path: Path) -> bool:

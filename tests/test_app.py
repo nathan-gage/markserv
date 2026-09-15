@@ -53,7 +53,7 @@ def test_event_stream_stops_when_broker_closes() -> None:
     async def run() -> None:
         broker = ReloadBroker()
         response = event_stream_response(broker, retry_ms=1000)
-        stream = cast(AsyncIterator[str], response.body_iterator.__aiter__())
+        stream = cast(AsyncIterator[str], aiter(response.body_iterator))
 
         assert await anext(stream) == "retry: 1000\n\n"
 

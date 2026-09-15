@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-import markserv.cli as cli
+from markserv import cli
 
 
 class FakeServer:
@@ -95,7 +95,7 @@ def test_cli_parses_options_and_invokes_server(monkeypatch: pytest.MonkeyPatch, 
     assert observed["server"] is fake_server
     assert callable(observed["before_shutdown"])
     assert observed["opened_url"] == "http://localhost:9000"
-    assert observed["timer_interval"] == 0.8
+    assert observed["timer_interval"] == pytest.approx(0.8)
 
 
 def test_find_available_port_skips_busy_port() -> None:
@@ -259,7 +259,7 @@ def test_cli_uses_uvicorn_reload_when_env_var_set(monkeypatch: pytest.MonkeyPatc
     assert observed["app_factory"] == "markserv.cli:create_app_from_env"
     assert observed["target_env"] == str(markdown_file.resolve())
     assert observed["opened_url"] == "http://localhost:9000"
-    assert observed["timer_interval"] == 0.8
+    assert observed["timer_interval"] == pytest.approx(0.8)
     assert observed["kwargs"] == {
         "factory": True,
         "host": "0.0.0.0",

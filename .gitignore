@@ -8,7 +8,6 @@ wheels/
 
 # Tool caches and reports
 .coverage
-.mypy_cache/
 .pyright/
 .pytest_cache/
 .ruff_cache/
