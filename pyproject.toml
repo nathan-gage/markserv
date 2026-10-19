@@ -43,7 +43,7 @@ dependencies = [
 dev = ["httpx2>=2.4.0", "pytest>=8.4.0", "yamlfix>=1.19.1"]
 lint = [
   "pyright>=1.1.408",
-  "ruff>=0.16.7,<0.17",
+  "ruff>=0.16.7,<0.18",
   "taplo>=0.9.3",
   "ty>=0.0.81",
   "types-pygments>=2.20.0.20260408",
