@@ -26,6 +26,7 @@ install-all-python: .uv ## Install and sync an environment for every supported P
 	UV_PROJECT_ENVIRONMENT=.venv312 uv sync --python 3.12 --frozen
 	UV_PROJECT_ENVIRONMENT=.venv313 uv sync --python 3.13 --frozen
 	UV_PROJECT_ENVIRONMENT=.venv314 uv sync --python 3.14 --frozen
+	UV_PROJECT_ENVIRONMENT=.venv315 uv sync --python 3.15 --frozen
 
 .PHONY: setup
 setup: install ## Backward-compatible alias for install
@@ -44,7 +45,7 @@ update-mermaid: ## Update Mermaid and refresh its vendored browser assets
 
 .PHONY: clean
 clean: ## Remove generated build and tool artifacts
-	rm -rf .coverage .pytest_cache .ruff_cache .pyright dist build htmlcov .venv311 .venv312 .venv313 .venv314
+	rm -rf .coverage .pytest_cache .ruff_cache .pyright dist build htmlcov .venv311 .venv312 .venv313 .venv314 .venv315
 
 .PHONY: format-python
 format-python: ## Format Python code
@@ -98,11 +99,12 @@ test: ## Run tests (set PYTEST_PYTHON=3.14 to choose an interpreter)
 	COLUMNS=120 $(if $(PYTEST_PYTHON),UV_PROJECT_ENVIRONMENT=.venv$(subst .,,$(PYTEST_PYTHON))) uv run $(if $(PYTEST_PYTHON),--python $(PYTEST_PYTHON)) pytest
 
 .PHONY: test-all-python
-test-all-python: ## Run tests on Python 3.11 to 3.14
+test-all-python: ## Run tests on Python 3.11 to 3.15
 	COLUMNS=120 UV_PROJECT_ENVIRONMENT=.venv311 uv run --python 3.11 pytest
 	COLUMNS=120 UV_PROJECT_ENVIRONMENT=.venv312 uv run --python 3.12 pytest
 	COLUMNS=120 UV_PROJECT_ENVIRONMENT=.venv313 uv run --python 3.13 pytest
 	COLUMNS=120 UV_PROJECT_ENVIRONMENT=.venv314 uv run --python 3.14 pytest
+	COLUMNS=120 UV_PROJECT_ENVIRONMENT=.venv315 uv run --python 3.15 pytest
 
 .PHONY: all
 all: format lint typecheck test ## Run the standard local development checks

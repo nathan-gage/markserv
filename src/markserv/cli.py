@@ -9,7 +9,7 @@ import socket
 import sys
 import threading
 import webbrowser
-from collections.abc import Awaitable, Callable, Iterator, Mapping
+from collections.abc import Awaitable, Callable, Generator, Mapping
 from pathlib import Path
 from typing import Annotated, Protocol
 
@@ -105,7 +105,7 @@ def _socket_family_for_host(host: str) -> socket.AddressFamily:
 
 
 @contextlib.contextmanager
-def _listening_probe_socket(host: str, port: int) -> Iterator[socket.socket]:
+def _listening_probe_socket(host: str, port: int) -> Generator[socket.socket]:
     with socket.socket(_socket_family_for_host(host), socket.SOCK_STREAM) as probe:
         probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         probe.bind((host, port))
@@ -145,7 +145,7 @@ def resolve_port(host: str, port: int) -> int:
 
 
 @contextlib.contextmanager
-def temporary_env(updates: Mapping[str, str]) -> Iterator[None]:
+def temporary_env(updates: Mapping[str, str]) -> Generator[None]:
     previous = {key: os.environ.get(key) for key in updates}
     os.environ.update(updates)
     try:
