@@ -4,7 +4,7 @@ import asyncio
 import contextlib
 import json
 import mimetypes
-from collections.abc import AsyncIterator, Awaitable, Callable
+from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TypeVar
@@ -269,7 +269,7 @@ def create_markserv_application(config_or_site: ServeConfig | SiteSource) -> Mar
     runtime = SiteRuntime(site=site, dev_reload=python_reload_enabled())
 
     @contextlib.asynccontextmanager
-    async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
         stop_event = asyncio.Event()
         tasks: list[asyncio.Task[None]] = []
 

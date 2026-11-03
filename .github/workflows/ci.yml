@@ -50,7 +50,7 @@ jobs:
               - 'uv.toml'
 
   checks:
-    name: checks / ubuntu / py3.14
+    name: checks / ubuntu / py3.15
     needs: changes
     if: ${{ needs.changes.outputs.python == 'true' }}
     runs-on: ubuntu-latest
@@ -62,9 +62,9 @@ jobs:
           persist-credentials: false
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v9.0.0
+        uses: astral-sh/setup-uv@v10.3.3
         with:
-          python-version: "3.14"
+          python-version: "3.15"
           enable-cache: true
           cache-python: true
           cache-suffix: checks
@@ -96,6 +96,7 @@ jobs:
           - "3.12"
           - "3.13"
           - "3.14"
+          - "3.15"
 
     steps:
       - name: Check out repository
@@ -104,7 +105,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v9.0.0
+        uses: astral-sh/setup-uv@v10.3.3
         with:
           python-version: ${{ matrix.python-version }}
           enable-cache: true
